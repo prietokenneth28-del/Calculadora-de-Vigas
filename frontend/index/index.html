@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="es" data-bs-theme="dark">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Calculadora de Vigas - Estilo SkyCiv</title>        
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="../CSS/finance-theme.css">
+    <style>
+        /* Estilos específicos para la calculadora para complementar finance-theme.css */
+        .canvas-placeholder {
+            background-color: #e2e8f0; /* Color claro para contraste del diagrama */
+            border-radius: 8px;
+            min-height: 300px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #4a5568;
+            border: 2px dashed #cbd5e0;
+        }
+        
+        .result-chart-placeholder {
+            background-color: #2d3748; /* Oscuro acorde al tema */
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            height: 200px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-muted);
+        }
+
+        .input-group-text-dark {
+            background-color: #2d3748;
+            color: var(--text-main);
+            border-color: var(--border-color);
+        }
+
+        /* Ajuste para listas de elementos (soportes/cargas) */
+        .item-list {
+            max-height: 150px;
+            overflow-y: auto;
+        }
+        .list-group-item-dark {
+            background-color: rgba(255,255,255,0.05);
+            border-color: var(--border-color);
+            color: var(--text-main);
+        }
+    </style>
+</head>
+
+<body> 
+    <nav class="navbar navbar-expand-lg navbar-custom sticky-top mb-4">
+        <div class="container-fluid container-main"> 
+            <a class="navbar-brand" href="index.html">
+                <img src="../logo.png" alt="Logo" width="30" height="30" class="d-inline-block align-text-top me-2">
+                Calculadora de Vigas
+            </a>
+            
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" 
+                    data-bs-target="#navbarMain" aria-controls="navbarMain" 
+                    aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon" style="filter: invert(1);"></span>
+            </button>
+
+            <div class="collapse navbar-collapse" id="navbarMain">
+                <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="#"><i class="bi bi-bezier2 nav-icon"></i>Diseño</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#"><i class="bi bi-file-earmark-pdf nav-icon"></i>Reportes</a>
+                    </li>
+                </ul>
+
+                <div class="d-flex align-items-center gap-3">
+                    <div class="d-none d-lg-block text-end me-2">
+                        <span class="text-light fw-medium" style="font-size: 0.9rem;">Usuario Invitado</span>
+                    </div>
+                    <button class="btn-logout-nav" id="BtnConfig">
+                        <i class="bi bi-gear"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="finance-container">       
+        <div class="row g-4">
+            
+            <div class="col-lg-4">
+                
+                <div class="finance-card mb-3">
+                    <div class="finance-card-header">
+                        <h3><i class="bi bi-rulers me-2"></i>Propiedades</h3>
+                    </div>
+                    <div class="p-3">
+                        <label class="form-label-enhanced">Longitud (L)</label>
+                        <div class="input-group mb-3">
+                            <input type="number" class="form-control" placeholder="Ej: 10" id="inputLongitud">
+                            <span class="input-group-text input-group-text-dark">m</span>
+                        </div>
+                    </div>
+                    <div class="p-3">
+                        <label class="form-label-enhanced">Tipo de Perfil</label>
+                        <div class="input-group mb-1">
+                            <select class="form-select form-select-sm" id="selectTipoSoporte">
+                                <option value="Tubulares">Tubulares</option>
+                                <option value="Tipo W">Tipo W</option>
+                                <option value="Tipo S">Tipo S</option>
+                                <option value="Tipo C">Tipo S</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="finance-card mb-3">
+                    <div class="finance-card-header d-flex justify-content-between align-items-center">
+                        <h3><i class="bi bi-caret-up-square me-2"></i>Soportes</h3>
+                    </div>
+                    <div class="p-3">
+                        <div class="row g-2 mb-2">
+                            <div class="col-5">
+                                <select class="form-select form-select-sm" id="selectTipoSoporte">
+                                    <option value="Fijo">Fijo</option>
+                                    <option value="Móvil">Móvil</option>
+                                    <option value="Empotrado">Empotrado</option>
+                                </select>
+                            </div>
+                            <div class="col-4">
+                                <input type="number" class="form-control form-control-sm" placeholder="Pos (m)" id="inputPosicionSoporte">
+                            </div>
+                            <div class="col-3">
+                                <button class="btn btn-sm btn-finance-primary w-100" id="btnAgregarSoporte">
+                                    <i class="bi bi-plus"></i>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <ul class="list-group item-list" id="listaSoportes">
+                            </ul>
+                    </div>
+                </div>
+
+                <div class="finance-card mb-4">
+                    <div class="finance-card-header d-flex justify-content-between align-items-center">
+                        <h3><i class="bi bi-arrow-down-square me-2"></i>Cargas</h3>
+                        <button class="btn btn-sm btn-outline-danger" title="Añadir Carga"><i class="bi bi-plus-lg"></i></button>
+                    </div>
+                    <div class="p-3">
+                        <div class="row g-2 mb-2">
+                            <div class="col-4">
+                                <select class="form-select form-select-sm">
+                                    <option>Puntual</option>
+                                    <option>Distribuida</option>
+                                    <option>Momento</option>
+                                </select>
+                            </div>
+                            <div class="col-3">
+                                <input type="number" class="form-control form-control-sm" placeholder="Mag">
+                            </div>
+                            <div class="col-3">
+                                <input type="number" class="form-control form-control-sm" placeholder="Pos">
+                            </div>
+                            <div class="col-2">
+                                <button class="btn btn-sm btn-finance-danger w-100"><i class="bi bi-arrow-down"></i></button>
+                            </div>
+                        </div>
+                        <ul class="list-group item-list">
+                            <li class="list-group-item list-group-item-dark d-flex justify-content-between align-items-center">
+                                <span><i class="bi bi-arrow-down text-danger"></i> 50kN @ 5m</span>
+                                <button class="btn btn-sm text-danger"><i class="bi bi-x"></i></button>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="d-grid">
+                    <button type="button" class="btn-finance btn-finance-success py-3" id="btnResolver">
+                        <i class="bi bi-calculator me-2"></i>RESOLVER VIGA
+                    </button>
+                </div>
+
+            </div>
+
+            <div class="col-lg-8">
+                
+                <div class="finance-card mb-4">
+                    <div class="finance-card-header d-flex justify-content-between align-items-center">
+                        <h3><i class="bi bi-display me-2"></i>Diagrama de la Viga</h3>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="checkPesoPropio">
+                            <label class="form-check-label text-muted" for="checkPesoPropio">Peso Propio</label>
+                        </div>
+                    </div>
+                    <div class="p-4 bg-dark">
+                        <div class="canvas-placeholder">
+                            <div class="text-center">
+                                <i class="bi bi-pencil-square fs-1 mb-2"></i>
+                                <p>El diagrama de la viga se renderizará aquí</p>
+                                <small class="text-muted">(L=10m, 2 Soportes, 1 Carga)</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="finance-card">
+                    <div class="finance-card-header">
+                        <ul class="nav nav-pills card-header-pills" id="resultsTab" role="tablist">
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link active" id="reactions-tab" data-bs-toggle="tab" data-bs-target="#reactions" type="button" role="tab">Reacciones</button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="sfd-tab" data-bs-toggle="tab" data-bs-target="#sfd" type="button" role="tab">Cortante (V)</button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="bmd-tab" data-bs-toggle="tab" data-bs-target="#bmd" type="button" role="tab">Momento (M)</button>
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="p-4">
+                        <div class="tab-content" id="myTabContent">
+                            <div class="tab-pane fade show active" id="reactions" role="tabpanel">
+                                <table class="finance-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Soporte</th>
+                                            <th>Posición</th>
+                                            <th>Reacción Vertical (Ry)</th>
+                                            <th>Reacción Horizontal (Rx)</th>
+                                            <th>Momento (M)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td>A (Fijo)</td>
+                                            <td>0.00 m</td>
+                                            <td class="text-success fw-bold">25.0 kN</td>
+                                            <td>0.0 kN</td>
+                                            <td>-</td>
+                                        </tr>
+                                        <tr>
+                                            <td>B (Móvil)</td>
+                                            <td>10.00 m</td>
+                                            <td class="text-success fw-bold">25.0 kN</td>
+                                            <td>-</td>
+                                            <td>-</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            
+                            <div class="tab-pane fade" id="sfd" role="tabpanel">
+                                <h5 class="mb-3 text-muted">Diagrama de Fuerza Cortante</h5>
+                                <div class="result-chart-placeholder">
+                                    <span class="text-muted">Gráfico SFD</span>
+                                </div>
+                            </div>
+
+                            <div class="tab-pane fade" id="bmd" role="tabpanel">
+                                <h5 class="mb-3 text-muted">Diagrama de Momento Flector</h5>
+                                <div class="result-chart-placeholder">
+                                    <span class="text-muted">Gráfico BMD</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="../ui/diseño.ui.js"></script>
+</body>
+</html>
