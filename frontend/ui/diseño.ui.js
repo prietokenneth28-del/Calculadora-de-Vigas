@@ -11,19 +11,33 @@ const selectTipoSoporte    = document.getElementById('selectTipoSoporte');
 const listaSoportesUI      = document.getElementById('listaSoportes'); // El <ul>
 
 // Elementos del card Cargas:
-const selectTipoCarga    = document.getElementById('selectTipoCarga');
-const inputMagnitudCarga = document.getElementById('inputMagnitudCarga');
-const inputPosicionCarga = document.getElementById('inputPosicionCarga');
-const btnAgregarCarga    = document.getElementById('btnAgregarCarga');
-const listaCargasUI      = document.getElementById('listaCargas');
+const selectTipoCarga         = document.getElementById('selectTipoCarga');
+const containerSubtipoCarga   = document.getElementById('containerSubtipoCarga'); // El div contenedor
+const selectSubtipoDistribuida= document.getElementById('selectSubtipoDistribuida'); // El segundo select
+const imgCargaPreview         = document.getElementById('imgCargaPreview');
+
+const inputMagnitudCarga      = document.getElementById('inputMagnitudCarga');
+const inputA                  = document.getElementById('inputA');
+const inputA1                 = document.getElementById('inputA1');
+const inputA2                 = document.getElementById('inputA2');
+const btnAgregarCarga         = document.getElementById('btnAgregarCarga');
+const listaCargasUI           = document.getElementById('listaCargas');
 
 // Estado local: Aquí guardamos los soportes agregados
 let listaSoportesDatos   = [];
 let condicionesIniciales = [];
 let listaCargasDatos = [];
 
+const IMAGENES_CARGAS = {
+    'Puntual': '../images/Puntual.jpg',
+    'Momento': '../images/Momento.jpg',
+    'Distribuida-Rectangular': '../images/Cuadrada.jpg',
+    'Distribuida-Triangular 1': '../images/Triangular 1.jpg',
+    'Distribuida-Triangular 2': '../images/Triangular 2.jpg'
+};
 
 const btnResolver = document.getElementById("btnResolver");
+
 //=====================================FUNCIONES============================================
 
 function renderizarListaSoportes() {
@@ -122,6 +136,45 @@ function eliminarCarga(index) {
 
 
 //======================LOGICA ACTIONS================================
+selectTipoCarga.addEventListener('change', () => {
+    const tipo = selectTipoCarga.value;
+
+    if (tipo === 'Distribuida') {
+        // Mostrar el segundo select
+        containerSubtipoCarga.style.display = 'block';
+        inputMagnitudCarga.placeholder = 'w0 (kN/m)'
+        inputA.style.display = 'none';
+        inputA1.style.display = 'block';
+        inputA2.style.display = 'block';
+        // Actualizar imagen basada en lo que tenga el segundo select (por defecto Rectangular)
+        actualizarImagenDistribuida();
+    } else {
+        // Ocultar segundo select
+        containerSubtipoCarga.style.display = 'none';
+        if (tipo === 'Momento'){
+             inputMagnitudCarga.placeholder = 'M0 (kN.m)'
+        }
+
+        inputA.style.display = 'block';
+        inputA1.style.display = 'none';
+        inputA2.style.display = 'none';
+        // Buscar imagen directa
+        if (IMAGENES_CARGAS[tipo]) {
+            imgCargaPreview.src = IMAGENES_CARGAS[tipo];
+        }
+    }
+});
+
+selectSubtipoDistribuida.addEventListener('change', actualizarImagenDistribuida);
+
+function actualizarImagenDistribuida() {
+    const subtipo = selectSubtipoDistribuida.value; // 'Rectangular' o 'Triangular'
+    const claveImagen = `Distribuida-${subtipo}`;
+    
+    if (IMAGENES_CARGAS[claveImagen]) {
+        imgCargaPreview.src = IMAGENES_CARGAS[claveImagen];
+    }
+}
 
 btnAgregarSoporte.addEventListener('click', () => {
     const tipo = selectTipoSoporte.value;
@@ -163,10 +216,17 @@ btnAgregarSoporte.addEventListener('click', () => {
 
 
 btnAgregarCarga.addEventListener('click', () => {
-    const tipo = selectTipoCarga.value;
+    let tipoPrincipal = selectTipoCarga.value;
     const magnitud = parseFloat(inputMagnitudCarga.value);
     const posicion = parseFloat(inputPosicionCarga.value);
     const longitudMax = parseFloat(inputLongitudViga.value);
+
+    // Validación extra: Definir el nombre real del tipo si es distribuida
+    let tipoFinal = tipoPrincipal;
+    if (tipoPrincipal === 'Distribuida') {
+        const subtipo = selectSubtipoDistribuida.value;
+        tipoFinal = `Distribuida (${subtipo})`; // Ej: "Distribuida (Triangular)"
+    }
 
     // Validaciones
     if(isNaN(longitudMax)) {
@@ -186,19 +246,17 @@ btnAgregarCarga.addEventListener('click', () => {
         return;
     }
 
-    // Agregar al array
+    // Agregar al array con el Tipo Final compuesto
     listaCargasDatos.push({
-        tipo: tipo,
+        tipo: tipoFinal,
         magnitud: magnitud,
         posicion: posicion
     });
 
-    // Ordenar por posición
     listaCargasDatos.sort((a, b) => a.posicion - b.posicion);
 
     renderizarListaCargas();
     
-    // Limpiar inputs (pero dejar el tipo seleccionado por comodidad)
     inputMagnitudCarga.value = '';
     inputPosicionCarga.value = '';
     inputMagnitudCarga.focus();
