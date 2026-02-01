@@ -153,7 +153,7 @@
                 
                 <div class="finance-card mb-3">
                     <div class="finance-card-header d-flex justify-content-between align-items-center">
-                        <h3><i class="bi bi-caret-up-square me-2"></i>Cargas</h3>
+                        <h3><i class="bi-arrow-down"></i>Cargas</h3>
                     </div>
                     <div class="p-3">
                         <div class="row g-2 mb-3 align-items-center">
@@ -226,12 +226,9 @@
                         </div>
                     </div>
                     <div class="p-4 bg-dark">
-                        <div class="canvas-placeholder">
-                            <div class="text-center">
-                                <i class="bi bi-pencil-square fs-1 mb-2"></i>
-                                <p>El diagrama de la viga se renderizará aquí</p>
-                                <small class="text-muted">(L=10m, 2 Soportes, 1 Carga)</small>
-                            </div>
+                        <div class="canvas-container bg-white rounded border border-secondary" style="height: 300px; position: relative; overflow: hidden;">
+                            <canvas id="canvasViga" width="800" height="300" style="width: 100%; height: 100%;"></canvas>
+                            <h3><i class="bi bi-display me-2"></i>Agregue información para dibujar la viga</h3>
                         </div>
                     </div>
                 </div>
@@ -264,24 +261,17 @@
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        <tr>
-                                            <td>A (Fijo)</td>
-                                            <td>0.00 m</td>
-                                            <td class="text-success fw-bold">25.0 kN</td>
-                                            <td>0.0 kN</td>
-                                            <td>-</td>
-                                        </tr>
-                                        <tr>
-                                            <td>B (Móvil)</td>
-                                            <td>10.00 m</td>
-                                            <td class="text-success fw-bold">25.0 kN</td>
-                                            <td>-</td>
-                                            <td>-</td>
-                                        </tr>
+                                        
                                     </tbody>
                                 </table>
                             </div>
-                            
+
+                            <div id="sinResultados" class="text-center py-5 d-none">
+                                <i class="bi bi-inbox display-4 text-muted mb-3"></i>
+                                <h5 class="text-muted">No se encontraron cortes</h5>
+                                <p class="text-muted">Intenta cambiar los filtros o crear un nuevo corte</p>
+                            </div>
+
                             <div class="tab-pane fade" id="sfd" role="tabpanel">
                                 <h5 class="mb-3 text-muted">Diagrama de Fuerza Cortante</h5>
                                 <div class="result-chart-placeholder">
@@ -304,6 +294,8 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
+    <script type="module" src="https://pyscript.net/releases/2026.1.1/core.js"></script>
     <script src="../ui/diseño.ui.js"></script>
+
 </body>
 </html>
