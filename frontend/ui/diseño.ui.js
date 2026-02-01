@@ -3,7 +3,7 @@
 ///Elementos del card vigas:
 const inputLongitudViga = document.getElementById("inputLongitud");
 const selectTipoPerfil  = document.getElementById("selectTipoPerfil");
-
+const inputFS           = document.getElementById("inputFS");
 //Elementos del card Soportes:
 const btnAgregarSoporte    = document.getElementById('btnAgregarSoporte');
 const inputPosicionSoporte = document.getElementById('inputPosicionSoporte');
@@ -535,13 +535,14 @@ btnResolver.addEventListener('click', () => {
     // Limpiamos el array anterior o creamos un objeto nuevo
     condicionesIniciales = {
         longitud: inputLongitudViga.value,
+        tipoPerfil: selectTipoPerfil.value,
+        factorSeguridad: inputFS.value,
         soportes: listaSoportesDatos,
         cargas: listaCargasDatos // <--- Agregamos las cargas aquí
     };
     
-    console.log("Datos listos para enviar a Python:");
-    console.table(condicionesIniciales);
-    
+    console.log(condicionesIniciales);
+    window.condicionesdeEsfierzo = () => condicionesIniciales;
     // Aquí iría el fetch() hacia tu backend Python
 });
 
@@ -551,4 +552,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // (Opcional) Exponer los datos globalmente si necesitas enviarlos a Python luego
     window.obtenerDatosSoportes = () => listaSoportesDatos;
 });
+
+
 selectTipoCarga.dispatchEvent(new Event('change'));
