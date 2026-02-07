@@ -1,4 +1,5 @@
 //===================================VARIABLES=============================================
+import { calcularReacciones } from './calculos.ui.js';
 
 ///Elementos del card vigas:
 const inputLongitudViga = document.getElementById("inputLongitud");
@@ -16,12 +17,17 @@ const containerSubtipoCarga   = document.getElementById('containerSubtipoCarga')
 const selectSubtipoDistribuida= document.getElementById('selectSubtipoDistribuida'); // El segundo select
 const imgCargaPreview         = document.getElementById('imgCargaPreview');
 
-const inputMagnitudCarga      = document.getElementById('inputMagnitudCarga');
-const inputA                  = document.getElementById('inputA');
-const inputA1                 = document.getElementById('inputA1');
-const inputA2                 = document.getElementById('inputA2');
-const btnAgregarCarga         = document.getElementById('btnAgregarCarga');
-const listaCargasUI           = document.getElementById('listaCargas');
+const inputMagnitudCarga = document.getElementById('inputMagnitudCarga');
+const inputA             = document.getElementById('inputA');
+const inputA1            = document.getElementById('inputA1');
+const inputA2            = document.getElementById('inputA2');
+const btnAgregarCarga    = document.getElementById('btnAgregarCarga');
+const listaCargasUI      = document.getElementById('listaCargas');
+
+// Buscamos el body de la tabla
+const tablaReaccionesBody = document.getElementById('tablaReaccionesBody');
+
+
 /* =========================================
    LÓGICA DEL DIAGRAMA (CANVAS)
    ========================================= */
@@ -532,18 +538,42 @@ btnAgregarCarga.addEventListener('click', () => {
 
 
 btnResolver.addEventListener('click', () => {
-    // Limpiamos el array anterior o creamos un objeto nuevo
-    condicionesIniciales = {
-        longitud: inputLongitudViga.value,
-        tipoPerfil: selectTipoPerfil.value,
-        factorSeguridad: inputFS.value,
-        soportes: listaSoportesDatos,
-        cargas: listaCargasDatos // <--- Agregamos las cargas aquí
-    };
+    // 2. Preparamos los datos
+    // Asegúrate de que las cargas tengan signo negativo si van hacia abajo
+    // (Depende de cómo las ingreses, aquí asumimos que el usuario pone el signo o tú lo fuerzas)
     
-    console.log(condicionesIniciales);
-    window.condicionesdeEsfierzo = () => condicionesIniciales;
-    // Aquí iría el fetch() hacia tu backend Python
+    console.log("Calculando vigas...");
+
+    // 3. Llamamos a la función de cálculo
+    const resultados = calcularReacciones(listaSoportesDatos, listaCargasDatos);
+
+    if (resultados) {
+        // 4. Limpiar tabla actual
+        tablaReaccionesBody.innerHTML = '';
+
+        // 5. Rellenar con los nuevos datos
+        resultados.forEach(res => {
+            const fila = document.createElement('tr');
+            
+            // Formateamos el número a 2 decimales y agregamos unidades
+            const reaccionFormateada = res.reaccion.toFixed(2) + ' kN';
+            const colorClase = res.reaccion >= 0 ? 'text-success' : 'text-danger';
+
+            fila.innerHTML = `
+                <td>${res.tipo}</td>
+                <td>${res.posicion} m</td>
+                <td class="${colorClase} fw-bold">${reaccionFormateada}</td>
+                <td>0.00 kN</td> <td>-</td>       `;
+
+            tablaReaccionesBody.appendChild(fila);
+        });
+
+        // Opcional: Cambiar automáticamente al tab de "Reacciones" para ver el resultado
+        const tabReacciones = new bootstrap.Tab(document.querySelector('#reactions-tab'));
+        tabReacciones.show();
+        
+        alert("¡Cálculo completado exitosamente!");
+    }
 });
 
 

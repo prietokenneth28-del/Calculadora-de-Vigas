@@ -4,16 +4,6 @@ const config = { }
 const math = create(all, config)
 
 // --- CORRECCIÓN 1: Estructura de Datos (Array de Objetos) ---
-const soportes = [
-    { tipo: 'fijo', posicion: 0 },
-    { tipo: 'fijo', posicion: 12 }
-];
-
-const cargas = [
-    { tipo: 'Puntual', magnitud: -12, posicion: 3 },
-    { tipo: 'Puntual', magnitud: -12, posicion: 6 },
-    { tipo: 'Puntual', magnitud: -12, posicion: 9 }
-];
 
 export function calcularReacciones(soportes, cargas) {
 
@@ -132,6 +122,3 @@ export function calcularReacciones(soportes, cargas) {
         return null;
     }
 }
-
-// Ejecutar prueba
-calcularReacciones(soportes, cargas);

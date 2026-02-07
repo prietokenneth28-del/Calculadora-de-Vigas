@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Método de la Rigidez: Análisis de Vigas</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; color: #334155; }
+        .chart-container { 
+            position: relative; 
+            width: 100%; 
+            max-width: 600px; 
+            margin-left: auto; 
+            margin-right: auto; 
+            height: 300px; 
+            max-height: 400px; 
+        }
+        .matrix-bracket {
+            border-left: 3px solid #0f172a;
+            border-right: 3px solid #0f172a;
+            border-radius: 8px;
+        }
+        .active-tab { border-bottom: 2px solid #3b82f6; color: #1e40af; }
+        .interactive-cell:hover { transform: scale(1.05); background-color: #dbeafe; cursor: help; }
+        .step-card { transition: all 0.3s ease; }
+        .step-card.active { border-left: 4px solid #3b82f6; background-color: #eff6ff; }
+        
+        /* Custom scrollbar for matrix overflow on small screens */
+        .matrix-scroll::-webkit-scrollbar { height: 6px; }
+        .matrix-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+    </style>
+
+    <!-- Chosen Palette: Slate (Neutral Background) + Blue (Primary Action/Highlight) + Indigo (Data Viz) -->
+    <!-- Application Structure Plan: 
+         1. Hero Section: Brief Definition & Hook.
+         2. Concepts Grid: Explaining Nodes, DOF, and Equilibrium in a digestible format.
+         3. Matrix Anatomy: Interactive breakdown of the 4x4 beam matrix. User hovers to see formula vs meaning.
+         4. Simulation Lab: User inputs E, I, L. App calculates K matrix numbers and updates a Chart.js visualization of stiffness sensitivity.
+         5. Methodology Roadmap: Vertical timeline explaining the Global Assembly process.
+         Reasoning: This flows from theory -> mathematical structure -> practical application -> algorithmic process.
+    -->
+    <!-- Visualization & Content Choices:
+         - Concept: Text Cards with Icons (Unicode) for readability.
+         - Matrix: CSS Grid with hover effects. Goal: Demystify the 4x4 array.
+         - Lab: Bar Chart comparing rotational vs translational stiffness terms. Goal: Visualize 'Stiffness' as a quantity.
+         - Process: Interactive Accordion/List. Goal: Show the algorithm steps clearly.
+    -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+</head>
+<body class="bg-slate-50 text-slate-800">
+
+    <!-- Navigation -->
+    <nav class="bg-white shadow-sm sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <span class="text-xl font-bold text-slate-900">FEM: Método de la Rigidez</span>
+                </div>
+                <div class="hidden sm:flex space-x-8 items-center">
+                    <button onclick="scrollToSection('intro')" class="text-slate-600 hover:text-blue-600 px-3 py-2 text-sm font-medium">Conceptos</button>
+                    <button onclick="scrollToSection('matrix')" class="text-slate-600 hover:text-blue-600 px-3 py-2 text-sm font-medium">La Matriz K</button>
+                    <button onclick="scrollToSection('lab')" class="text-blue-600 bg-blue-50 hover:bg-blue-100 px-3 py-2 rounded-md text-sm font-medium">Laboratorio Interactivo</button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <header class="bg-white border-b border-slate-200">
+        <div class="max-w-7xl mx-auto px-4 py-16 sm:px-6 lg:px-8 text-center">
+            <h1 class="text-4xl font-extrabold text-slate-900 sm:text-5xl tracking-tight">Análisis de Vigas por Elementos Finitos</h1>
+            <p class="mt-4 text-xl text-slate-600 max-w-3xl mx-auto">
+                Una exploración interactiva del <strong>Método de la Rigidez</strong> (Stiffness Method). Descubre cómo transformamos propiedades físicas en sistemas matriciales para predecir el comportamiento estructural.
+            </p>
+            <div class="mt-8 flex justify-center gap-4">
+                <button onclick="scrollToSection('lab')" class="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition shadow-lg">
+                    Simular Viga
+                </button>
+                <button onclick="scrollToSection('intro')" class="bg-white text-slate-700 border border-slate-300 px-6 py-3 rounded-lg font-semibold hover:bg-slate-50 transition">
+                    Ver Teoría
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Section 1: Core Concepts -->
+    <section id="intro" class="py-12 bg-slate-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="mb-10 text-center">
+                <h2 class="text-3xl font-bold text-slate-900">Fundamentos del Método</h2>
+                <p class="mt-2 text-slate-600 max-w-2xl mx-auto">
+                    El método de la rigidez se basa en discretizar la estructura en elementos interconectados por nodos. 
+                    Aquí presentamos los pilares fundamentales para el análisis de vigas.
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <!-- Card 1 -->
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition">
+                    <div class="w-12 h-12 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center text-2xl mb-4">⛯</div>
+                    <h3 class="text-lg font-semibold text-slate-900 mb-2">1. Discretización</h3>
+                    <p class="text-slate-600 text-sm">
+                        La viga continua se divide en "elementos finitos". Para una viga simple, un elemento se define entre dos puntos (Nodos i y j).
+                    </p>
+                </div>
+                <!-- Card 2 -->
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition">
+                    <div class="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-lg flex items-center justify-center text-2xl mb-4">↺</div>
+                    <h3 class="text-lg font-semibold text-slate-900 mb-2">2. Grados de Libertad (GDL)</h3>
+                    <p class="text-slate-600 text-sm">
+                        Cada nodo tiene movimientos posibles. En vigas planas 2D, consideramos 2 GDL por nodo: <strong>Desplazamiento Vertical ($v$)</strong> y <strong>Rotación ($\theta$)</strong>. Total: 4 GDL por elemento.
+                    </p>
+                </div>
+                <!-- Card 3 -->
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition">
+                    <div class="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-lg flex items-center justify-center text-2xl mb-4">∑</div>
+                    <h3 class="text-lg font-semibold text-slate-900 mb-2">3. Equilibrio Nodal</h3>
+                    <p class="text-slate-600 text-sm">
+                        La ecuación fundamental es $\{F\} = [K]\{d\}$. Las fuerzas externas en los nodos deben equilibrarse con las fuerzas internas generadas por la deformación de los elementos.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Section 2: Matrix Anatomy -->
+    <section id="matrix" class="py-12 bg-white border-y border-slate-200">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+                
+                <!-- Left: Explanation -->
+                <div>
+                    <h2 class="text-3xl font-bold text-slate-900 mb-4">La Matriz de Rigidez Local ($K$)</h2>
+                    <p class="text-slate-600 mb-6">
+                        Para un elemento de viga de Bernoulli sometido a flexión, la matriz de rigidez es de tamaño <strong>4x4</strong>. Relaciona las fuerzas nodales (Cortante $V$, Momento $M$) con los desplazamientos ($v, \theta$).
+                    </p>
+                    <p class="text-sm text-slate-500 mb-4 bg-slate-50 p-4 rounded-lg border-l-4 border-blue-500">
+                        <strong>Interacción:</strong> Pasa el mouse (o toca) los términos de la matriz a la derecha para ver qué fuerzas representan. Observa la simetría y los patrones de signos.
+                    </p>
+                    
+                    <div id="matrix-detail" class="bg-slate-50 p-6 rounded-lg border border-slate-200 min-h-[160px]">
+                        <h4 class="font-semibold text-blue-800 mb-2" id="detail-title">Selecciona un término</h4>
+                        <p class="text-slate-600 text-sm" id="detail-desc">Explora la matriz para entender la relación entre fuerzas y desplazamientos.</p>
+                    </div>
+                </div>
+
+                <!-- Right: Interactive Matrix -->
+                <div class="flex justify-center items-center overflow-x-auto matrix-scroll py-4">
+                    <div class="flex items-center text-xl sm:text-2xl font-mono text-slate-800">
+                        <span class="mr-2 italic text-slate-500">K = <span class="text-blue-600">EI / L³</span> &times; </span>
+                        <div class="matrix-bracket px-4 py-2 grid grid-cols-4 gap-2 sm:gap-4 text-center">
+                            
+                            <!-- Row 1 -->
+                            <div class="interactive-cell p-2 rounded transition" onmouseenter="showDetail('k11')" onmouseleave="resetDetail()">12</div>
+                            <div class="interactive-cell p-2 rounded transition" onmouseenter="showDetail('k12')" onmouseleave="resetDetail()">6L</div>
+                            <div class="interactive-cell p-2 rounded transition" onmouseenter="showDetail('k13')" onmouseleave="resetDetail()">-12</div>
+                            <div class="interactive-cell p-2 rounded transition" onmouseenter="showDetail('k14')" onmouseleave="resetDetail()">6L</div>
+
+                            <!-- Row 2 -->
+                            <div class="interactive-cell p-2 rounded transition" onmouseenter="showDetail('k21')" onmouseleave="resetDetail()">6L</div>
+                            <div class="interactive-cell p-2 rounded transition" onmouseenter="showDetail('k22')" onmouseleave="resetDetail()">4L²</div>
+                            <div class="interactive-cell p-2 rounded transition" onmouseenter="showDetail('k23')" onmouseleave="resetDetail()">-6L</div>
+                            <div class="interactive-cell p-2 rounded transition" onmouseenter="showDetail('k24')" onmouseleave="resetDetail()">2L²</div>
+
+                            <!-- Row 3 -->
+                            <div class="interactive-cell p-2 rounded transition" onmouseenter="showDetail('k31')" onmouseleave="resetDetail()">-12</div>
+                            <div class="interactive-cell p-2 rounded transition" onmouseenter="showDetail('k32')" onmouseleave="resetDetail()">-6L</div>
+                            <div class="interactive-cell p-2 rounded transition" onmouseenter="showDetail('k33')" onmouseleave="resetDetail()">12</div>
+                            <div class="interactive-cell p-2 rounded transition" onmouseenter="showDetail('k34')" onmouseleave="resetDetail()">-6L</div>
+
+                            <!-- Row 4 -->
+                            <div class="interactive-cell p-2 rounded transition" onmouseenter="showDetail('k41')" onmouseleave="resetDetail()">6L</div>
+                            <div class="interactive-cell p-2 rounded transition" onmouseenter="showDetail('k42')" onmouseleave="resetDetail()">2L²</div>
+                            <div class="interactive-cell p-2 rounded transition" onmouseenter="showDetail('k43')" onmouseleave="resetDetail()">-6L</div>
+                            <div class="interactive-cell p-2 rounded transition" onmouseenter="showDetail('k44')" onmouseleave="resetDetail()">4L²</div>
+
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </section>
+
+    <!-- Section 3: Interactive Lab -->
+    <section id="lab" class="py-16 bg-slate-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="mb-8">
+                <h2 class="text-3xl font-bold text-slate-900">Laboratorio de Rigidez</h2>
+                <p class="text-slate-600 mt-2">
+                    Modifica las propiedades de la viga para recalcular la matriz en tiempo real.
+                    Observa cómo la longitud ($L$) afecta drásticamente a la rigidez debido a los términos cúbicos ($L^3$).
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                
+                <!-- Controls -->
+                <div class="bg-white p-6 rounded-xl shadow-lg border border-slate-100 h-fit">
+                    <h3 class="text-lg font-bold text-slate-800 mb-6 border-b pb-2">Parámetros de Entrada</h3>
+                    
+                    <div class="space-y-6">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">Módulo de Elasticidad (E) [GPa]</label>
+                            <input type="range" id="inputE" min="20" max="210" value="200" step="10" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600">
+                            <div class="flex justify-between text-xs text-slate-500 mt-1">
+                                <span>Concreto (20)</span>
+                                <span id="valE" class="font-bold text-blue-700 text-base">200</span>
+                                <span>Acero (210)</span>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">Inercia (I) [cm⁴]</label>
+                            <input type="range" id="inputI" min="1000" max="50000" value="8000" step="1000" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600">
+                            <div class="flex justify-between text-xs text-slate-500 mt-1">
+                                <span>Delgada</span>
+                                <span id="valI" class="font-bold text-blue-700 text-base">8000</span>
+                                <span>Robusta</span>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">Longitud (L) [m]</label>
+                            <input type="range" id="inputL" min="2" max="10" value="5" step="0.5" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600">
+                            <div class="flex justify-between text-xs text-slate-500 mt-1">
+                                <span>Corta (2m)</span>
+                                <span id="valL" class="font-bold text-blue-700 text-base">5.0</span>
+                                <span>Larga (10m)</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-8 bg-blue-50 p-4 rounded text-sm text-blue-800">
+                        <strong>Factor de Rigidez (EI/L³):</strong> <span id="stiffnessFactor">...</span> kN/m
+                    </div>
+                </div>
+
+                <!-- Matrix Live Output -->
+                <div class="bg-white p-6 rounded-xl shadow-lg border border-slate-100 flex flex-col items-center justify-center">
+                    <h3 class="text-lg font-bold text-slate-800 mb-4">Matriz Calculada [kN, m, rad]</h3>
+                    <div class="text-xs sm:text-sm font-mono bg-slate-900 text-green-400 p-6 rounded-lg w-full overflow-x-auto shadow-inner">
+                        <table class="w-full text-right border-collapse">
+                            <tbody id="matrixOutput">
+                                <!-- JS Populated -->
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="text-xs text-slate-400 mt-4 text-center">
+                        Valores reales calculados usando las entradas. Observa la magnitud de los términos diagonales.
+                    </p>
+                </div>
+
+                <!-- Visualization Chart -->
+                <div class="bg-white p-6 rounded-xl shadow-lg border border-slate-100 flex flex-col">
+                    <h3 class="text-lg font-bold text-slate-800 mb-4">Análisis de Sensibilidad</h3>
+                    <div class="flex-grow flex items-center justify-center">
+                        <div class="chart-container">
+                            <canvas id="stiffnessChart"></canvas>
+                        </div>
+                    </div>
+                    <p class="text-xs text-slate-500 mt-2 text-center">
+                        Comparación de Rigidez a Translación Vertical (K11) vs. Rigidez a Rotación (K22).
+                    </p>
+                </div>
+
+            </div>
+        </div>
+    </section>
+
+    <!-- Section 4: Process & Algorithm -->
+    <section class="py-12 bg-white">
+        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-12">
+                <h2 class="text-3xl font-bold text-slate-900">Algoritmo de Solución Global</h2>
+                <p class="mt-2 text-slate-600">
+                    Cómo pasamos de matrices locales a la solución de la estructura completa.
+                </p>
+            </div>
+
+            <div class="relative border-l-4 border-slate-200 ml-4 md:ml-0 space-y-8">
+                
+                <!-- Step 1 -->
+                <div class="step-card group relative pl-8 md:pl-0">
+                    <div class="hidden md:block absolute -left-3 top-0 w-6 h-6 bg-slate-200 rounded-full border-4 border-white group-hover:bg-blue-500 transition"></div>
+                    <div class="md:flex items-start">
+                        <div class="md:w-1/3 md:text-right md:pr-8 mb-2 md:mb-0">
+                            <h4 class="text-lg font-bold text-slate-800">1. Ensamble Global</h4>
+                            <span class="text-xs font-mono text-blue-600 bg-blue-50 px-2 py-1 rounded">[K_global]</span>
+                        </div>
+                        <div class="md:w-2/3 bg-slate-50 p-4 rounded-lg border border-slate-100 hover:border-blue-200 transition">
+                            <p class="text-slate-600 text-sm">
+                                Se suman las matrices de rigidez locales ($k$) en una gran matriz global ($K_G$) basándose en la numeración de los grados de libertad de cada nodo. Los términos que comparten un nodo se suman.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 2 -->
+                <div class="step-card group relative pl-8 md:pl-0">
+                    <div class="hidden md:block absolute -left-3 top-0 w-6 h-6 bg-slate-200 rounded-full border-4 border-white group-hover:bg-blue-500 transition"></div>
+                    <div class="md:flex items-start">
+                        <div class="md:w-1/3 md:text-right md:pr-8 mb-2 md:mb-0">
+                            <h4 class="text-lg font-bold text-slate-800">2. Condiciones de Frontera</h4>
+                            <span class="text-xs font-mono text-purple-600 bg-purple-50 px-2 py-1 rounded">Reducción</span>
+                        </div>
+                        <div class="md:w-2/3 bg-slate-50 p-4 rounded-lg border border-slate-100 hover:border-purple-200 transition">
+                            <p class="text-slate-600 text-sm">
+                                Se aplican los apoyos. Si un nodo está empotrado, sus desplazamientos son cero. Eliminamos las filas y columnas correspondientes de la matriz global o usamos el método de penalización.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 3 -->
+                <div class="step-card group relative pl-8 md:pl-0">
+                    <div class="hidden md:block absolute -left-3 top-0 w-6 h-6 bg-slate-200 rounded-full border-4 border-white group-hover:bg-blue-500 transition"></div>
+                    <div class="md:flex items-start">
+                        <div class="md:w-1/3 md:text-right md:pr-8 mb-2 md:mb-0">
+                            <h4 class="text-lg font-bold text-slate-800">3. Solución del Sistema</h4>
+                            <span class="text-xs font-mono text-emerald-600 bg-emerald-50 px-2 py-1 rounded">{d} = [K]⁻¹{F}</span>
+                        </div>
+                        <div class="md:w-2/3 bg-slate-50 p-4 rounded-lg border border-slate-100 hover:border-emerald-200 transition">
+                            <p class="text-slate-600 text-sm">
+                                Se resuelve el sistema de ecuaciones lineales reducidas. El resultado es el vector de desplazamientos $\{d\}$ (traslaciones y giros) en cada nodo libre.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 4 -->
+                <div class="step-card group relative pl-8 md:pl-0">
+                    <div class="hidden md:block absolute -left-3 top-0 w-6 h-6 bg-slate-200 rounded-full border-4 border-white group-hover:bg-blue-500 transition"></div>
+                    <div class="md:flex items-start">
+                        <div class="md:w-1/3 md:text-right md:pr-8 mb-2 md:mb-0">
+                            <h4 class="text-lg font-bold text-slate-800">4. Post-Proceso</h4>
+                            <span class="text-xs font-mono text-orange-600 bg-orange-50 px-2 py-1 rounded">{f} = [k]{d}</span>
+                        </div>
+                        <div class="md:w-2/3 bg-slate-50 p-4 rounded-lg border border-slate-100 hover:border-orange-200 transition">
+                            <p class="text-slate-600 text-sm">
+                                Con los desplazamientos conocidos, regresamos a las ecuaciones locales de cada elemento para calcular las fuerzas internas (Momentos flectores y fuerzas cortantes).
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="bg-slate-900 text-slate-400 py-8 text-center border-t border-slate-800">
+        <p class="text-sm">Herramienta Interactiva Educativa | Análisis Matricial de Estructuras</p>
+    </footer>
+
+    <!-- JavaScript Logic -->
+    <script>
+        // --- 1. Interaction Handling: Matrix Detail Hover ---
+        const matrixDetails = {
+            'k11': { title: 'K11: Cortante en i / Desplazamiento en i', desc: 'Fuerza vertical necesaria en el nodo i para producir una traslación unitaria en i, manteniendo los otros GDL fijos. Valor: 12EI/L³' },
+            'k12': { title: 'K12: Cortante en i / Giro en i', desc: 'Fuerza vertical en i generada al rotar el nodo i. Existe acoplamiento entre traslación y rotación. Valor: 6EI/L²' },
+            'k13': { title: 'K13: Cortante en i / Desplazamiento en j', desc: 'Reacción vertical en i debido a un desplazamiento en el nodo opuesto j. Es negativo por equilibrio. Valor: -12EI/L³' },
+            'k14': { title: 'K14: Cortante en i / Giro en j', desc: 'Fuerza en i debido a la rotación del nodo j. Valor: 6EI/L²' },
+            'k21': { title: 'K21: Momento en i / Desplazamiento en i', desc: 'Momento generado en i por una traslación vertical. Simétrico a K12. Valor: 6EI/L²' },
+            'k22': { title: 'K22: Momento en i / Giro en i', desc: 'Rigidez rotacional directa. Momento necesario para rotar el nodo i un radián. Valor: 4EI/L' },
+            'k23': { title: 'K23: Momento en i / Desplazamiento en j', desc: 'Momento en i debido al movimiento de j. Valor: -6EI/L²' },
+            'k24': { title: 'K24: Momento en i / Giro en j', desc: 'Momento de transporte. Momento inducido en i cuando gira j. Fundamental en Cross. Valor: 2EI/L' },
+            // ... Symmetry patterns allow simplifying others implies
+            'k31': { title: 'K31: Cortante en j / Desplazamiento en i', desc: 'Reacción en j debido al movimiento de i. Simétrico a K13. Valor: -12EI/L³' },
+            'k32': { title: 'K32: Cortante en j / Giro en i', desc: 'Reacción en j debido al giro de i. Valor: -6EI/L²' },
+            'k33': { title: 'K33: Cortante en j / Desplazamiento en j', desc: 'Rigidez vertical directa en j. Idéntica a K11. Valor: 12EI/L³' },
+            'k34': { title: 'K34: Cortante en j / Giro en j', desc: 'Acoplamiento cortante-giro en j. Valor: -6EI/L²' },
+            'k41': { title: 'K41: Momento en j / Desplazamiento en i', desc: 'Momento en j debido a traslación en i. Valor: 6EI/L²' },
+            'k42': { title: 'K42: Momento en j / Giro en i', desc: 'Momento de transporte en j debido a giro en i. Valor: 2EI/L' },
+            'k43': { title: 'K43: Momento en j / Desplazamiento en j', desc: 'Acoplamiento momento-traslación en j. Valor: -6EI/L²' },
+            'k44': { title: 'K44: Momento en j / Giro en j', desc: 'Rigidez rotacional directa en j. Idéntica a K22. Valor: 4EI/L' }
+        };
+
+        function showDetail(key) {
+            const data = matrixDetails[key];
+            if(data) {
+                document.getElementById('detail-title').innerText = data.title;
+                document.getElementById('detail-desc').innerText = data.desc;
+                document.getElementById('detail-title').className = "font-bold text-blue-800 mb-2 transition-all";
+            }
+        }
+
+        function resetDetail() {
+            document.getElementById('detail-title').innerText = "Selecciona un término";
+            document.getElementById('detail-desc').innerText = "Explora la matriz para entender la relación entre fuerzas y desplazamientos.";
+            document.getElementById('detail-title').className = "font-semibold text-slate-800 mb-2";
+        }
+
+        // --- 2. Functional Navigation ---
+        function scrollToSection(id) {
+            const element = document.getElementById(id);
+            if (element) {
+                element.scrollIntoView({ behavior: 'smooth' });
+            }
+        }
+
+        // --- 3. Lab Logic & Chart ---
+        const inputE = document.getElementById('inputE');
+        const inputI = document.getElementById('inputI');
+        const inputL = document.getElementById('inputL');
+        
+        const valE = document.getElementById('valE');
+        const valI = document.getElementById('valI');
+        const valL = document.getElementById('valL');
+        const factorDisplay = document.getElementById('stiffnessFactor');
+
+        let stiffnessChart;
+
+        function initChart() {
+            const ctx = document.getElementById('stiffnessChart').getContext('2d');
+            stiffnessChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Traslación (K11)', 'Rotación (K22)', 'Acoplamiento (K12)'],
+                    datasets: [{
+                        label: 'Rigidez Relativa (kN/m ó kNm/rad)',
+                        data: [0, 0, 0],
+                        backgroundColor: [
+                            'rgba(59, 130, 246, 0.7)', // Blue
+                            'rgba(16, 185, 129, 0.7)', // Green
+                            'rgba(99, 102, 241, 0.7)'  // Indigo
+                        ],
+                        borderColor: [
+                            'rgb(59, 130, 246)',
+                            'rgb(16, 185, 129)',
+                            'rgb(99, 102, 241)'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false, // Critical for container scaling
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: { display: true, text: 'Magnitud' }
+                        }
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return context.parsed.y.toFixed(2) + ' Unidades';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function calculateMatrix() {
+            // Inputs
+            // E in GPa -> convert to kN/m2: GPa * 1e6
+            // I in cm4 -> convert to m4: cm4 * 1e-8
+            // L in m
+            const E_GPa = parseFloat(inputE.value);
+            const I_cm4 = parseFloat(inputI.value);
+            const L = parseFloat(inputL.value);
+
+            // Update Labels
+            valE.innerText = E_GPa;
+            valI.innerText = I_cm4;
+            valL.innerText = L.toFixed(1);
+
+            // Calculations
+            const E = E_GPa * 1e6; // kN/m2
+            const I = I_cm4 * 1e-8; // m4
+            const EI = E * I;
+            
+            // Common terms
+            const L2 = L * L;
+            const L3 = L * L * L;
+
+            const k11 = (12 * EI) / L3;
+            const k12 = (6 * EI) / L2;
+            const k22 = (4 * EI) / L;
+            const k24 = (2 * EI) / L;
+
+            // Update Factor Display
+            const factor = EI / L3;
+            factorDisplay.innerText = factor.toFixed(2);
+
+            // Populate HTML Table
+            const tableHTML = `
+                <tr class="border-b border-slate-700">
+                    <td class="p-2 text-blue-400 font-bold">${k11.toFixed(1)}</td>
+                    <td class="p-2">${k12.toFixed(1)}</td>
+                    <td class="p-2 text-slate-500">${(-k11).toFixed(1)}</td>
+                    <td class="p-2">${k12.toFixed(1)}</td>
+                </tr>
+                <tr class="border-b border-slate-700">
+                    <td class="p-2">${k12.toFixed(1)}</td>
+                    <td class="p-2 text-green-400 font-bold">${k22.toFixed(1)}</td>
+                    <td class="p-2">${(-k12).toFixed(1)}</td>
+                    <td class="p-2">${k24.toFixed(1)}</td>
+                </tr>
+                <tr class="border-b border-slate-700">
+                    <td class="p-2 text-slate-500">${(-k11).toFixed(1)}</td>
+                    <td class="p-2">${(-k12).toFixed(1)}</td>
+                    <td class="p-2">${k11.toFixed(1)}</td>
+                    <td class="p-2">${(-k12).toFixed(1)}</td>
+                </tr>
+                <tr>
+                    <td class="p-2">${k12.toFixed(1)}</td>
+                    <td class="p-2">${k24.toFixed(1)}</td>
+                    <td class="p-2">${(-k12).toFixed(1)}</td>
+                    <td class="p-2 text-green-400 font-bold">${k22.toFixed(1)}</td>
+                </tr>
+            `;
+            document.getElementById('matrixOutput').innerHTML = tableHTML;
+
+            // Update Chart
+            if (stiffnessChart) {
+                // We normalize purely for visualization comparison, as rotation/translation have different units
+                // Here we show magnitude to demonstrate the impact of L on Translation (L^3) vs Rotation (L)
+                stiffnessChart.data.datasets[0].data = [k11, k22, k12];
+                stiffnessChart.update();
+            }
+        }
+
+        // Event Listeners
+        inputE.addEventListener('input', calculateMatrix);
+        inputI.addEventListener('input', calculateMatrix);
+        inputL.addEventListener('input', calculateMatrix);
+
+        // Initialization
+        window.addEventListener('load', () => {
+            initChart();
+            calculateMatrix();
+        });
+
+    </script>
+</body>
+</html>
