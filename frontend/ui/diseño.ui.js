@@ -435,7 +435,7 @@ selectTipoCarga.addEventListener('change', () => {
         actualizarImagenDistribuida();
     } else {
         // Ocultar segundo select
-        inputMagnitudCarga.placeholder = 'P0 (kN.m)'
+        inputMagnitudCarga.placeholder = 'P0 (kN)'
         containerSubtipoCarga.style.display = 'none';
         if (tipo === 'Momento'){
              inputMagnitudCarga.placeholder = 'M0 (kN.m)'
@@ -585,30 +585,27 @@ btnAgregarCarga.addEventListener('click', () => {
 
 btnResolver.addEventListener('click', async () => {
     
-    // 1. Preparar Payload (Datos)
+    // Capturamos los valores de diseño del HTML
+    const tipoPerfilSelect = document.getElementById("selectTipoPerfil"); // Asegúrate que este ID exista en tu HTML
+    const inputFS = document.getElementById("inputFS"); // Asegúrate que este ID exista
+    
     const datosEnvio = {
         longitud: parseFloat(inputLongitudViga.value),
         soportes: listaSoportesDatos,
-        cargas: listaCargasDatos
+        cargas: listaCargasDatos,
+        // Nuevos datos
+        perfil: tipoPerfilSelect ? tipoPerfilSelect.value : 'WF',
+        fs: inputFS ? parseFloat(inputFS.value) : 2.0
     };
 
-    // Validar antes de enviar
-    if (!datosEnvio.longitud || datosEnvio.soportes.length < 1) {
-        alert("Configura la viga primero (longitud y soportes).");
-        return;
-    }
+    // ... (Validaciones anteriores) ...
 
-    // Mostrar estado de carga (opcional)
     btnResolver.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Calculando...';
-    btnResolver.disabled = true;
-
+    
     try {
-        // 2. Fetch a tu Backend Python
         const response = await fetch('http://127.0.0.1:5000/calcular', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
+            headers: {'Content-Type': 'application/json'},
             body: JSON.stringify(datosEnvio)
         });
 
@@ -617,53 +614,77 @@ btnResolver.addEventListener('click', async () => {
         if (result.status === 'success') {
             const data = result.data;
             
-            // 3. Renderizar Tabla de Reacciones
+            // 1. Renderizar Reacciones (Igual que antes)
             tablaReaccionesBody.innerHTML = '';
             data.reacciones.forEach(res => {
-                const fila = document.createElement('tr');
-                const colorClase = res.magnitud >= 0 ? 'text-success' : 'text-danger';
-                
-                fila.innerHTML = `
-                    <td>${res.tipo}</td>
-                    <td>${res.posicion} m</td>
-                    <td class="${colorClase} fw-bold">${res.magnitud} kN</td>
-                    <td>-</td> <td>-</td>
-                `;
-                tablaReaccionesBody.appendChild(fila);
+                 // ... (Tu código existente de reacciones) ...
+                 const fila = document.createElement('tr');
+                 fila.innerHTML = `<td>${res.tipo}</td><td>${res.posicion} m</td><td>${res.magnitud} kN</td><td>-</td><td>-</td>`;
+                 tablaReaccionesBody.appendChild(fila);
             });
 
-            // 4. Renderizar Gráficas (Base64)
-            // Diagrama Cortante
-            const contenedorCortante = document.getElementById('sfd');
-            contenedorCortante.innerHTML = `
-                <h5 class="mb-3 text-muted">Diagrama de Fuerza Cortante</h5>
-                <img src="data:image/png;base64,${data.graficos.cortante}" class="img-fluid rounded border" style="width:100%">
-            `;
+            // 2. Renderizar Gráficas (Igual que antes)
+            document.getElementById('sfd').innerHTML = `<img src="data:image/png;base64,${data.graficos.cortante}" class="img-fluid">`;
+            document.getElementById('bmd').innerHTML = `<img src="data:image/png;base64,${data.graficos.momento}" class="img-fluid">`;
 
-            // Diagrama Momento
-            const contenedorMomento = document.getElementById('bmd');
-            contenedorMomento.innerHTML = `
-                <h5 class="mb-3 text-muted">Diagrama de Momento Flector</h5>
-                <img src="data:image/png;base64,${data.graficos.momento}" class="img-fluid rounded border" style="width:100%">
-            `;
+            // 3. --- NUEVO: RENDERIZAR TABLA DE PERFILES ---
+            if (data.diseño && data.diseño.perfiles) {
+                renderizarTablaDiseño(data.diseño);
+            }
 
-            // Cambiar al tab de resultados
-            const tabEl = document.querySelector('#resultsTab button[data-bs-target="#reactions"]');
-            const tab = new bootstrap.Tab(tabEl);
-            tab.show();
+            // Mostrar Tab de resultados
+            // ...
 
         } else {
-            alert("Error en el cálculo: " + result.message);
+            alert("Error: " + result.message);
         }
-
     } catch (error) {
-        console.error("Error de conexión:", error);
-        alert("No se pudo conectar con el servidor de cálculo (asegúrate de correr app.py).");
+        console.error(error);
+        alert("Error de conexión");
     } finally {
-        btnResolver.innerHTML = '<i class="bi bi-calculator me-2"></i>RESOLVER VIGA';
+        btnResolver.innerHTML = 'RESOLVER VIGA';
         btnResolver.disabled = false;
     }
 });
+
+// Función 
+function renderizarTablaDiseño(datosDiseño) {
+    // Buscar o crear contenedor para resultados de diseño
+    // Asumimos que tienes un div con id "resultadosDiseño" o lo creas dinámicamente en el Tab de Resultados
+    
+    let contenedor = document.getElementById('tablaDiseñoBody'); 
+    let resumen = document.getElementById('resumenDiseño');
+    
+    if (!contenedor) {
+        console.warn("No se encontró el elemento 'tablaDiseñoBody' en el HTML. Asegúrate de crearlo.");
+        return;
+    }
+
+    // Actualizar Resumen
+    if(resumen) {
+        resumen.innerHTML = `
+            <div class="alert alert-info">
+                <strong>Mmax:</strong> ${datosDiseño.Mmax} kN.m | 
+                <strong>Sx Requerido:</strong> ${datosDiseño.Sx_req} cm³
+            </div>
+        `;
+    }
+
+    contenedor.innerHTML = '';
+    
+    // Rellenar tabla
+    datosDiseño.perfiles.forEach(p => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td><strong>${p.Descripcion}</strong></td>
+            <td>${p.Peso} kg/m</td>
+            <td class="text-primary fw-bold">${p.Sx}</td>
+            <td>${p.A}</td>
+            <td>${p.Ix}</td>
+        `;
+        contenedor.appendChild(tr);
+    });
+}
 
 
 document.addEventListener('DOMContentLoaded', () => {

@@ -16,7 +16,7 @@ tiposCarga      = ["Puntual" , ...
 %% Condiciones del problema
 %longitud de la viga:
 l = 1.4;
-Sy = 250; %Esfuerzo de fluencia del acero estructural A-36
+Sy = 25; %Esfuerzo de fluencia del acero estructural A-36
 FS = 2; %Factor de seguridad asumido por el diseñador.
 %Reacciones:
 
@@ -385,7 +385,7 @@ Mmax = max([max(M), abs(min(M))]);
 Sigma_per = Sy / FS; 
 
 % Modulo de seccion requerido (cm^3):
-Sx_req = (Mmax / Sigma_per) / 1000;
+Sx_req = (Mmax * 100 / Sigma_per);
 
 % Tipo de perfil a utilizar
 perfil = ["WF", "HE", "S"];
