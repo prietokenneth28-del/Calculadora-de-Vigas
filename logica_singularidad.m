@@ -15,7 +15,9 @@ tiposCarga      = ["Puntual" , ...
 
 %% Condiciones del problema
 %longitud de la viga:
-l = 15;
+l = 1.4;
+Sy = 250; %Esfuerzo de fluencia del acero estructural A-36
+FS = 2; %Factor de seguridad asumido por el diseñador.
 %Reacciones:
 
 %Las reacciones estan organizadas por (coeficiente, distancia(m))
@@ -28,14 +30,14 @@ rb = [  5  ...                   %ubicación [m]
         tiposReacciones(1,1) ... %tipo de apoyo 
      ];
 
-rc = [  15  ...                   %ubicación [m]
+rc = [  1.4  ...                   %ubicación [m]
         tiposReacciones(1,1) ... %tipo de apoyo 
     ];
 
 
 
 %Lista de reacciones
-r = [ra; rb; rc]; 
+r = [ra; rc]; 
 %------------------------------
 
 %Fuerzas aplicadas
@@ -52,8 +54,8 @@ fb = [ -5 ...%Magnitud   [kN]
         0   ...%final     [m]
         tiposCarga(5)
      ];
-fc = [ -12 ... %Magnitud  [kN]
-        9 ... %Ubicacion [m]
+fc = [ -196.2/2 ... %Magnitud  [kN]
+        0.7 ... %Ubicacion [m]
         0  ... %final     [m]
         tiposCarga(1)
      ];
@@ -84,7 +86,7 @@ v = v(2:end);
 end
 
 %% Procesamiento de las fuerzas:
-f  = [fa; fb];
+f  = [fc];
 a = min(double(r(:,1)));  % Distancia de la reaccion mas cercana al origen
 paso = 0.01;
 
@@ -344,32 +346,85 @@ if varM1 ~= 0
     end 
 end
 
-tiledlayout(2,1)
+% tiledlayout(2,1)
 
-L = 0:paso:l;
-%Diagrama de fuerza cortante:
-nexttile
-    plot(L,v,'black','LineWidth',3)
-    hold on
-    title('Diagrama de Fuerza cortante')
-    xline(0,LineWidth=2)
-    yline(0,LineWidth=2)
-    xlim([-0.5 l+1])
-    xlabel('x[m]')
-    ylabel('V[kN]')
-    area(L,v,'FaceColor', "#0072BD", 'LineWidth', 2)
-    grid on
-    hold off
+% L = 0:paso:l;
+% %Diagrama de fuerza cortante:
+% nexttile
+%     plot(L,v,'black','LineWidth',3)
+%     hold on
+%     title('Diagrama de Fuerza cortante')
+%     xline(0,LineWidth=2)
+%     yline(0,LineWidth=2)
+%     xlim([-0.5 l+1])
+%     xlabel('x[m]')
+%     ylabel('V[kN]')
+%     area(L,v,'FaceColor', "#0072BD", 'LineWidth', 2)
+%     grid on
+%     hold off
 
-%Diagrama de momento flector
-nexttile
-    plot(L,M,'Color','black','LineWidth',4)
-    hold on
-    title('Diagrama de Momento flector')
-    xline(0,LineWidth=2)
-    yline(0,LineWidth=2)
-    xlim([-0.5 l+1])
-    xlabel('x[m]')
-    ylabel('M[kN.m]')
-    area(L,M,'FaceColor',"#D95319")
-    grid on
+% %Diagrama de momento flector
+% nexttile
+%     plot(L,M,'Color','black','LineWidth',4)
+%     hold on
+%     title('Diagrama de Momento flector')
+%     xline(0,LineWidth=2)
+%     yline(0,LineWidth=2)
+%     xlim([-0.5 l+1])
+%     xlabel('x[m]')
+%     ylabel('M[kN.m]')
+%     area(L,M,'FaceColor',"#D95319")
+%     grid on
+
+%% Analisis de esfuerzo de la viga:
+
+% Determinacion del momento flector maximo:
+Mmax = max([max(M), abs(min(M))]);
+
+% Esfuerzo permisible:
+Sigma_per = Sy / FS; 
+
+% Modulo de seccion requerido (cm^3):
+Sx_req = (Mmax / Sigma_per) / 1000;
+
+% Tipo de perfil a utilizar
+perfil = ["WF", "HE", "S"];
+perfilUtilizado = perfil(3);
+
+% Carga de informacion segun el perfil
+switch perfilUtilizado
+    case "WF"
+        T = readtable('./perfiles/WF.xlsx');
+    case "HE"
+        T = readtable('./perfiles/HE.xlsx');
+    case "S"
+        T = readtable('./perfiles/S.xlsx');
+end
+
+arregloPerfiles = table2struct(T);
+
+Sx_tabla = arrayfun(@(x) str2double(x.Sx), arregloPerfiles);
+Sx_tabla = num2cell(Sx_tabla);
+[arregloPerfiles.Sx] = deal(Sx_tabla{:});
+
+Ix_tabla = arrayfun(@(x) str2double(x.Ix), arregloPerfiles);
+Ix_tabla = num2cell(Ix_tabla);
+[arregloPerfiles.Ix] = deal(Ix_tabla{:});
+
+A_tabla = arrayfun(@(x) str2double(x.A), arregloPerfiles);
+A_tabla = num2cell(A_tabla);
+[arregloPerfiles.A] = deal(A_tabla{:});
+
+Peso_tabla = arrayfun(@(x) str2double(x.Peso), arregloPerfiles);
+Peso_tabla = num2cell(Peso_tabla);
+[arregloPerfiles.Peso] = deal(Peso_tabla{:});
+
+
+% Seleccion de perfiles que cumplen
+Sxx = [arregloPerfiles.Sx];
+posicion = find(Sxx >= Sx_req, 10);
+
+tablaResultados = struct2table(arregloPerfiles(posicion))
+
+
+

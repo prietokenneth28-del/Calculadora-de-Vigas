@@ -1,5 +1,4 @@
 //===================================VARIABLES=============================================
-import { calcularReacciones } from './calculos.ui.js';
 
 ///Elementos del card vigas:
 const inputLongitudViga = document.getElementById("inputLongitud");
@@ -171,7 +170,6 @@ function dibujarDiagrama() {
 
     const L = parseFloat(inputLongitudViga.value);
     
-    // Si no hay longitud válida, no dibujamos nada o mostramos mensaje
     if (!L || L <= 0) {
         ctx.font = "16px Arial";
         ctx.fillStyle = "#666";
@@ -179,21 +177,27 @@ function dibujarDiagrama() {
         return;
     }
 
-    // 2. Configuración de Escala (Márgenes y conversión metros -> píxeles)
+    // 2. Configuración de Escala
     const margenX = 50;
-    const ejeY = canvas.height / 2 + 50; // Bajamos un poco la viga para dar espacio a cargas arriba
+    // Bajamos un poco más el eje Y para dar espacio a cargas distribuidas altas y visualización
+    const ejeY = canvas.height / 2 + 60; 
     const anchoUtil = canvas.width - (margenX * 2);
     const escalaPxPorMetro = anchoUtil / L;
 
     // Función auxiliar para convertir metros a posición X en canvas
     const xPos = (metros) => margenX + (metros * escalaPxPorMetro);
 
+    // --- NUEVO: DIBUJAR GRID ---
+    // Lo dibujamos ANTES de la viga para que quede de fondo
+    dibujarGrid(ctx, L, xPos, canvas.height);
+    // ---------------------------
+
     // 3. Dibujar la VIGA
     ctx.beginPath();
     ctx.moveTo(xPos(0), ejeY);
     ctx.lineTo(xPos(L), ejeY);
     ctx.lineWidth = 6;
-    ctx.strokeStyle = "#4a5568"; // Color gris oscuro (finance-theme)
+    ctx.strokeStyle = "#4a5568"; 
     ctx.stroke();
 
     // 4. Dibujar SOPORTES
@@ -209,6 +213,48 @@ function dibujarDiagrama() {
 }
 
 // --- Funciones Auxiliares de Dibujo ---
+function dibujarGrid(ctx, L, xPosFn, canvasHeight) {
+    ctx.save(); // Guardamos el estado para no afectar los otros dibujos
+    
+    ctx.lineWidth = 1;
+    ctx.textAlign = "center";
+    ctx.font = "12px Arial";
+
+    // 1. Determinar el intervalo dinámicamente
+    // Si la viga es muy larga, mostramos cada 2m o 5m. Si es corta, cada 0.5m o 1m.
+    let intervalo = 1; 
+    if (L <= 5) intervalo = 0.5;
+    else if (L > 15 && L <= 30) intervalo = 2;
+    else if (L > 30) intervalo = 5;
+
+    // 2. Dibujar líneas verticales y textos
+    // Recorremos desde 0 hasta L sumando el intervalo
+    // Usamos un pequeño margen de error (epsilon) para asegurar que se dibuje el último punto
+    for (let m = 0; m <= L + 0.001; m += intervalo) {
+        // Obtenemos la coordenada X en píxeles usando tu función xPos
+        const xPx = xPosFn(m);
+
+        // a. Línea Vertical (Grid)
+        ctx.beginPath();
+        ctx.strokeStyle = "#4c4c4d"; // Gris muy claro (sutil)
+        ctx.setLineDash([5, 5]);      // Línea punteada
+        ctx.moveTo(xPx, 0);
+        ctx.lineTo(xPx, canvasHeight - 20); // Dejamos espacio abajo para el texto
+        ctx.stroke();
+
+        // b. Texto (Medida)
+        // Solo dibujamos el texto si hay espacio suficiente o si es un entero
+        // Para evitar amontonamiento en intervalos decimales
+        ctx.fillStyle = "#718096"; // Gris texto
+        ctx.setLineDash([]);       // Quitamos punteado para el texto
+        
+        // Redondeamos para evitar decimales largos (ej: 3.0000001)
+        const etiqueta = Math.round(m * 100) / 100; 
+        ctx.fillText(etiqueta + "m", xPx, canvasHeight - 5);
+    }
+
+    ctx.restore(); // Restauramos el estado original del contexto
+}
 
 function dibujarSoporte(ctx, x, y, tipo) {
     ctx.fillStyle = "#ed8936"; // Naranja (warning-accent)
@@ -537,42 +583,85 @@ btnAgregarCarga.addEventListener('click', () => {
 });
 
 
-btnResolver.addEventListener('click', () => {
-    // 2. Preparamos los datos
-    // Asegúrate de que las cargas tengan signo negativo si van hacia abajo
-    // (Depende de cómo las ingreses, aquí asumimos que el usuario pone el signo o tú lo fuerzas)
+btnResolver.addEventListener('click', async () => {
     
-    console.log("Calculando vigas...");
+    // 1. Preparar Payload (Datos)
+    const datosEnvio = {
+        longitud: parseFloat(inputLongitudViga.value),
+        soportes: listaSoportesDatos,
+        cargas: listaCargasDatos
+    };
 
-    // 3. Llamamos a la función de cálculo
-    const resultados = calcularReacciones(listaSoportesDatos, listaCargasDatos);
+    // Validar antes de enviar
+    if (!datosEnvio.longitud || datosEnvio.soportes.length < 1) {
+        alert("Configura la viga primero (longitud y soportes).");
+        return;
+    }
 
-    if (resultados) {
-        // 4. Limpiar tabla actual
-        tablaReaccionesBody.innerHTML = '';
+    // Mostrar estado de carga (opcional)
+    btnResolver.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Calculando...';
+    btnResolver.disabled = true;
 
-        // 5. Rellenar con los nuevos datos
-        resultados.forEach(res => {
-            const fila = document.createElement('tr');
-            
-            // Formateamos el número a 2 decimales y agregamos unidades
-            const reaccionFormateada = res.reaccion.toFixed(2) + ' kN';
-            const colorClase = res.reaccion >= 0 ? 'text-success' : 'text-danger';
-
-            fila.innerHTML = `
-                <td>${res.tipo}</td>
-                <td>${res.posicion} m</td>
-                <td class="${colorClase} fw-bold">${reaccionFormateada}</td>
-                <td>0.00 kN</td> <td>-</td>       `;
-
-            tablaReaccionesBody.appendChild(fila);
+    try {
+        // 2. Fetch a tu Backend Python
+        const response = await fetch('http://127.0.0.1:5000/calcular', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(datosEnvio)
         });
 
-        // Opcional: Cambiar automáticamente al tab de "Reacciones" para ver el resultado
-        const tabReacciones = new bootstrap.Tab(document.querySelector('#reactions-tab'));
-        tabReacciones.show();
-        
-        alert("¡Cálculo completado exitosamente!");
+        const result = await response.json();
+
+        if (result.status === 'success') {
+            const data = result.data;
+            
+            // 3. Renderizar Tabla de Reacciones
+            tablaReaccionesBody.innerHTML = '';
+            data.reacciones.forEach(res => {
+                const fila = document.createElement('tr');
+                const colorClase = res.magnitud >= 0 ? 'text-success' : 'text-danger';
+                
+                fila.innerHTML = `
+                    <td>${res.tipo}</td>
+                    <td>${res.posicion} m</td>
+                    <td class="${colorClase} fw-bold">${res.magnitud} kN</td>
+                    <td>-</td> <td>-</td>
+                `;
+                tablaReaccionesBody.appendChild(fila);
+            });
+
+            // 4. Renderizar Gráficas (Base64)
+            // Diagrama Cortante
+            const contenedorCortante = document.getElementById('sfd');
+            contenedorCortante.innerHTML = `
+                <h5 class="mb-3 text-muted">Diagrama de Fuerza Cortante</h5>
+                <img src="data:image/png;base64,${data.graficos.cortante}" class="img-fluid rounded border" style="width:100%">
+            `;
+
+            // Diagrama Momento
+            const contenedorMomento = document.getElementById('bmd');
+            contenedorMomento.innerHTML = `
+                <h5 class="mb-3 text-muted">Diagrama de Momento Flector</h5>
+                <img src="data:image/png;base64,${data.graficos.momento}" class="img-fluid rounded border" style="width:100%">
+            `;
+
+            // Cambiar al tab de resultados
+            const tabEl = document.querySelector('#resultsTab button[data-bs-target="#reactions"]');
+            const tab = new bootstrap.Tab(tabEl);
+            tab.show();
+
+        } else {
+            alert("Error en el cálculo: " + result.message);
+        }
+
+    } catch (error) {
+        console.error("Error de conexión:", error);
+        alert("No se pudo conectar con el servidor de cálculo (asegúrate de correr app.py).");
+    } finally {
+        btnResolver.innerHTML = '<i class="bi bi-calculator me-2"></i>RESOLVER VIGA';
+        btnResolver.disabled = false;
     }
 });
 
