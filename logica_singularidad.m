@@ -15,7 +15,7 @@ tiposCarga      = ["Puntual" , ...
 
 %% Condiciones del problema
 %longitud de la viga:
-l = 12;
+l = 15;
 %Reacciones:
 
 %Las reacciones estan organizadas por (coeficiente, distancia(m))
@@ -24,48 +24,40 @@ ra = [  0  ...                   %ubicación [m]
         tiposReacciones(1,1) ... %tipo de apoyo 
      ];
 
-rb = [  6  ...                   %ubicación [m]
+rb = [  5  ...                   %ubicación [m]
         tiposReacciones(1,1) ... %tipo de apoyo 
      ];
 
-rc = [  9  ...                   %ubicación [m]
+rc = [  15  ...                   %ubicación [m]
         tiposReacciones(1,1) ... %tipo de apoyo 
     ];
 
-rd = [  12  ...                   %ubicación [m]
-        tiposReacciones(1,1) ... %tipo de apoyo 
-    ];
 
 
 %Lista de reacciones
-r = [ra; rb; rc; rd]; 
+r = [ra; rb; rc]; 
 %------------------------------
 
 %Fuerzas aplicadas
 %%Las fuerzas estan organizadas por (magnitud, distancia(m))
 
-fa = [ -12 ... %Magnitud  [kN]
-        3  ... %Ubicacion [m]
-        0  ... %final     [m]
-        tiposCarga(1)...
+fa = [ -10 ... %Magnitud  [kN]
+        0  ... %Ubicacion [m]
+        15  ... %final     [m]
+        tiposCarga(2)...
      ];
 
-fb = [ -50 ...%Magnitud   [kN]
-        6   ...%Ubicacion [m] 
-        9   ...%final     [m]
-        tiposCarga(2)
+fb = [ -5 ...%Magnitud   [kN]
+        10   ...%Ubicacion [m] 
+        0   ...%final     [m]
+        tiposCarga(5)
      ];
 fc = [ -12 ... %Magnitud  [kN]
-        11 ... %Ubicacion [m]
+        9 ... %Ubicacion [m]
         0  ... %final     [m]
         tiposCarga(1)
      ];
 
-Mc = [ -12 ... %Magnitud  [kN]
-        11 ... %Ubicacion [m]
-        0  ... %final     [m]
-        tiposCarga(5)
-     ];
 
 %% Nivel de indeterminación de la viga:
 n = 0;  
@@ -78,17 +70,21 @@ end
 disp("Grado de indeterminación: " + n)
 
 %% Funcion para singularidad:
-function v = singularidad(a,e,A,Longitud)
+function v = singularidad(a,n,A,Longitud)
 v = 0;
     for x = 0:0.01:Longitud
-        w1 = (A/factorial(e)) * (x - a)^e * heaviside(x - a);
+        if a > x
+        v = [v 0];
+        else 
+        w1 = (A/factorial(n))*(x-a)^n;
         v = [v w1]; 
+        end 
     end
 v = v(2:end);
 end
 
 %% Procesamiento de las fuerzas:
-f  = [fa; fb; fc; Mc];
+f  = [fa; fb];
 a = min(double(r(:,1)));  % Distancia de la reaccion mas cercana al origen
 paso = 0.01;
 
@@ -233,19 +229,49 @@ end
 %% Ecuaciones de singularidad simbólicas para las reacciones:
 
 
-msim = 0; % Para almacenar la ecuacion:
-var  = sym('R', [1 length(r)]);
+msim = c1 * x + c2; % Para almacenar la ecuacion:
+MSIM = 0;
+%Validacion del tipo de apoyo para calcular el momento:
 
+var  = sym('R', [1 length(r)]); %Reacciones a calcular:
+varM = sym('M', [1 length(r)]); %Momento a calcular
+
+varM1 = 0;
 %Se haya la ecuacion general de singularidad simbolica para las reacciones:
 for j = 1:length(r)
-    posicion = double(r(j,1));
-    msim = (var(j)/6) * (x - posicion)^3 * heaviside(x - posicion) + msim; 
-end
+    if r(j,2) == tiposReacciones(1,3)
+        posicion = double(r(j,1));
 
-msim = msim + c1 * x + c2;
+        %------------------------------DEFLEXION:--------------------------------
+        %Momento:
+        msim = (varM(j) / 24) * (x - posicion)^4 * heaviside(x - posicion) + msim;
+        %Fuerza:
+        msim = (var(j) / 6) * (x - posicion)^3 * heaviside(x - posicion) + msim;
+        
+        %------------------------------MOMENTO-----------------------------------
+        %Momento:
+        MSIM = varM(j) * (x - posicion)^0 * heaviside(x - posicion) + MSIM;
+        %Fuerza:
+        MSIM = var(j)  * (x - posicion)^1 * heaviside(x - posicion) + MSIM;
+
+
+        varM1 = [varM1 varM(j)]; %Vector para almacenar las incognitas de Momento en empotramiento
+    else
+        posicion = double(r(j,1));
+
+        %------------------------------DEFLEXION:--------------------------------
+        msim = (var(j) / 6) * (x - posicion)^3 * heaviside(x - posicion) + msim; 
+
+        %------------------------------MOMENTO-----------------------------------
+        MSIM = var(j)  * (x - posicion)^1 * heaviside(x - posicion) + MSIM;
+    end
+
+end
+varM1 = varM1(2:end);
 
 %Determinacion del sistema de ecuaciones:
-ec = sym(zeros(length(r),1));
+ec = sym(zeros(length(r),1)); %Cantidad de ecuaciones 
+ecM = sym(zeros(2,1));   %Condiciones de Frontera para momento
 
 for i = 1:length(r)
     posicion = double(r(i,1));
@@ -254,40 +280,69 @@ for i = 1:length(r)
     ec(i,1)  = subs(msim,x,posicion) + y(indice_vector);
 end
 
+%Ecuaciones de condiciones de frontera para el momento:
+ecM(1,1) = subs(MSIM,x,0) + M(1);
+ecM(2,1) = subs(MSIM,x,l) + M(end);
+
+
 % Para despejar el numero de ecuaciones necesarias para resolver la indeterminación
-unk = [c1 c2 var(1:n-2)];
-sol = solve(ec, unk, 'ReturnConditions', false);
+if isempty(varM1) %Por si no existe un caso de empotramiento
+    varM1 = 0;
+    unk = [c1 c2 var(1 : n - 2)];
+    sol = solve(ec, unk, 'ReturnConditions', false);
+else %Para detectar caso de empotramiento
+    unk = [c1 c2 var(1 : 2) varM1];
+    sol = solve([ec(1:2) ecM], unk, 'ReturnConditions', false);
+end
 
-%%% --------------------automarizar esto-------------------------
 
-ecucionesAdicionales = sym('eq', [1 n-2]);
+ecucionesAdicionales = sym('eq', [1 n - 2]);
 j = 1;
+
+%Para ordenar el numero de ecuaciones necesarias para resolver el sistema:
 for i = 1 : n - 2
     ecucionesAdicionales(i) = sol.(char(var(j))) - var(j);
     j = j + 1; 
 end
 
+
 %% Armado de ecuaciones:
 
 fr =  sum(fed(:,1));                                %Termino independiente de la fuerza 
-mr =  sum((fed(:,2) - a) .* fed(:,1)) + momentos;   %Termino independiente del momento                  
+mr =  sum((fed(:,2)) .* fed(:,1)) -  momentos;   %Termino independiente del momento                  
 
 %Sistema de ecuaciones provenientes de las condiciones de equilibrio
 ec1 = sum(var) == -fr;
-ec2 = var * (double(r(:,1)) - a) == -mr;
+ec2 = (var * (double(r(:,1)) - a)) + varM1 == -mr;
+
+%SOLUCION: si existe una union empotrada o no:
+if varM1 == 0 
+    sol = solve([ec1 ec2 ecucionesAdicionales==0] , var);
+else 
+    sol = solve([ec1 ec2 ecucionesAdicionales==0] , [var varM1]);
+end
 
 
-%SOLUCION:
-sol = solve([ec1 ec2 ecucionesAdicionales==0] , var);
-
-
-for i = 1:n
+%Calculo de singularidad para las reacciones ya calculado:
+for i = 1 : length(var)
     magnitud = double(sol.(char(var(i))));
     posicion = double(r(i,1));
-
+    
+    disp("R" + num2str(i) + " = " + num2str(magnitud,'%.2f'))
     v = v + singularidad(posicion, 0, magnitud, l);
     M = M + singularidad(posicion, 1, magnitud, l);
 end 
+
+%Calculo de singularidad para los momentos ya calculado si existe algun empotramiento:
+if varM1 ~= 0 
+    for i = 1 : length(varM1)
+        magnitud = double(sol.(char(varM1(i))));
+        posicion = double(r(i,1));
+
+        disp("M" + num2str(i) + " = " + num2str(magnitud,'%.2f'))
+        M = M + singularidad(posicion, 0, magnitud, l);
+    end 
+end
 
 tiledlayout(2,1)
 
