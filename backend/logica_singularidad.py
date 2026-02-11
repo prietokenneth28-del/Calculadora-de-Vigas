@@ -26,49 +26,67 @@ def buscar_perfiles_optimos(Sx_req, tipo_perfil):
     Sx_req: Módulo de sección requerido en cm^3
     tipo_perfil: 'WF', 'HE', o 'S'
     """
-    archivo_csv = f"../perfiles/{tipo_perfil}.xlsx" 
     
-    # Mapeo de nombres de archivo si son diferentes en tu carpeta
+    # 1. Rutas absolutas (Igual que antes)
+    directorio_actual = os.path.dirname(os.path.abspath(__file__))
+    ruta_carpeta_perfiles = os.path.join(os.path.dirname(directorio_actual), 'perfiles')
+    
     mapa_archivos = {
         'WF': 'WF.xlsx', 
         'HE': 'HE.xlsx',
         'S':  'S.xlsx'
     }
     
-    if tipo_perfil in mapa_archivos:
-        archivo_csv = f"../perfiles/{mapa_archivos[tipo_perfil]}"
+    nombre_archivo = mapa_archivos.get(tipo_perfil)
+    if not nombre_archivo:
+        return []
 
+    archivo_csv = os.path.join(ruta_carpeta_perfiles, nombre_archivo)
+    
     candidatos = []
     
     try:
         if not os.path.exists(archivo_csv):
+            print(f"No encontrado: {archivo_csv}")
             return [{"Descripcion": "Error: Archivo no encontrado", "Sx": 0, "Peso": 0}]
 
-        with open(archivo_csv, mode='r', encoding='utf-8-sig') as f:
+        # --- CORRECCIÓN AQUÍ: Usamos 'latin-1' en lugar de 'utf-8-sig' ---
+        # 'latin-1' lee cualquier byte sin dar error, ideal para archivos de Excel antiguos o ANSI.
+        with open(archivo_csv, mode='r', encoding='latin-1') as f:
             reader = csv.DictReader(f)
             
             for row in reader:
                 try:
-                    # Parsear valores, a veces vienen como strings
-                    sx_row = float(row['Sx'])
+                    # Limpiamos posibles espacios en blanco en las claves si el CSV está sucio
+                    # (A veces Excel deja espacios como 'Sx ' o ' Sx')
+                    row_clean = {k.strip(): v for k, v in row.items() if k}
+                    
+                    if 'Sx' not in row_clean:
+                        continue
+
+                    sx_row = float(row_clean['Sx'])
+                    
                     if sx_row >= Sx_req:
                         candidatos.append({
-                            'Descripcion': row['Descripcion'],
+                            'Descripcion': row_clean.get('Descripcion', 'Sin nombre'),
                             'Sx': sx_row,
-                            'Peso': float(row['Peso']),
-                            'A': float(row['A']),
-                            'Ix': float(row['Ix'])
+                            'Peso': float(row_clean.get('Peso', 0)),
+                            'A': float(row_clean.get('A', 0)),
+                            'Ix': float(row_clean.get('Ix', 0))
                         })
-                except ValueError:
-                    continue # Saltar filas con errores de formato
+                except (ValueError, KeyError):
+                    continue 
                     
-        # Ordenar por peso (el más liviano primero es el más económico) y tomar los primeros 10
         candidatos.sort(key=lambda x: x['Peso'])
+        
+        if not candidatos:
+            return [{"Descripcion": "Ningún perfil cumple el requerimiento", "Sx": 0, "Peso": 0}]
+            
         return candidatos[:10]
 
     except Exception as e:
         print(f"Error leyendo perfiles: {e}")
-        return []
+        return [{"Descripcion": f"Error: {str(e)}", "Sx": 0, "Peso": 0}]
 
 # --- FUNCIÓN PRINCIPAL ---
 def resolver_viga_backend(longitud, soportes_input, cargas_input, perfil_usuario="WF", fs_usuario=2.0):
