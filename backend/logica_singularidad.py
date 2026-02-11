@@ -4,8 +4,9 @@ import matplotlib.pyplot as plt
 from math import factorial
 import io
 import base64
-import csv
 import os
+import zipfile
+import xml.etree.ElementTree as ET
 
 import matplotlib
 matplotlib.use('Agg')
@@ -41,41 +42,36 @@ def buscar_perfiles_optimos(Sx_req, tipo_perfil):
     if not nombre_archivo:
         return []
 
-    archivo_csv = os.path.join(ruta_carpeta_perfiles, nombre_archivo)
+    archivo_excel = os.path.join(ruta_carpeta_perfiles, nombre_archivo)
     
     candidatos = []
     
     try:
-        if not os.path.exists(archivo_csv):
-            print(f"No encontrado: {archivo_csv}")
+        if not os.path.exists(archivo_excel):
+            print(f"No encontrado: {archivo_excel}")
             return [{"Descripcion": "Error: Archivo no encontrado", "Sx": 0, "Peso": 0}]
 
-        # --- CORRECCIÓN AQUÍ: Usamos 'latin-1' en lugar de 'utf-8-sig' ---
-        # 'latin-1' lee cualquier byte sin dar error, ideal para archivos de Excel antiguos o ANSI.
-        with open(archivo_csv, mode='r', encoding='latin-1') as f:
-            reader = csv.DictReader(f)
-            
-            for row in reader:
-                try:
-                    # Limpiamos posibles espacios en blanco en las claves si el CSV está sucio
-                    # (A veces Excel deja espacios como 'Sx ' o ' Sx')
-                    row_clean = {k.strip(): v for k, v in row.items() if k}
-                    
-                    if 'Sx' not in row_clean:
-                        continue
+        filas = _leer_filas_excel(archivo_excel)
 
-                    sx_row = float(row_clean['Sx'])
-                    
-                    if sx_row >= Sx_req:
-                        candidatos.append({
-                            'Descripcion': row_clean.get('Descripcion', 'Sin nombre'),
-                            'Sx': sx_row,
-                            'Peso': float(row_clean.get('Peso', 0)),
-                            'A': float(row_clean.get('A', 0)),
-                            'Ix': float(row_clean.get('Ix', 0))
-                        })
-                except (ValueError, KeyError):
-                    continue 
+        for row in filas:
+            try:
+                row_clean = {k.strip(): v for k, v in row.items() if k}
+
+                if 'Sx' not in row_clean:
+                    continue
+
+                sx_row = float(row_clean['Sx'])
+
+                if sx_row >= Sx_req:
+                    candidatos.append({
+                        'Descripcion': row_clean.get('Descripcion', 'Sin nombre'),
+                        'Sx': sx_row,
+                        'Peso': float(row_clean.get('Peso', 0)),
+                        'A': float(row_clean.get('A', 0)),
+                        'Ix': float(row_clean.get('Ix', 0))
+                    })
+            except (ValueError, KeyError, TypeError):
+                continue
                     
         candidatos.sort(key=lambda x: x['Peso'])
         
@@ -87,6 +83,66 @@ def buscar_perfiles_optimos(Sx_req, tipo_perfil):
     except Exception as e:
         print(f"Error leyendo perfiles: {e}")
         return [{"Descripcion": f"Error: {str(e)}", "Sx": 0, "Peso": 0}]
+
+
+def _leer_filas_excel(ruta_excel):
+    """
+    Lee la primera hoja de un archivo .xlsx sin dependencias externas
+    y la retorna como lista de diccionarios.
+    """
+    ns = {'a': 'http://schemas.openxmlformats.org/spreadsheetml/2006/main'}
+
+    with zipfile.ZipFile(ruta_excel) as z:
+        strings = []
+        if 'xl/sharedStrings.xml' in z.namelist():
+            root_strings = ET.fromstring(z.read('xl/sharedStrings.xml'))
+            for si in root_strings.findall('a:si', ns):
+                texto = ''.join(t.text or '' for t in si.findall('.//a:t', ns))
+                strings.append(texto)
+
+        sheet = ET.fromstring(z.read('xl/worksheets/sheet1.xml'))
+        rows = sheet.findall('.//a:sheetData/a:row', ns)
+
+        if not rows:
+            return []
+
+        encabezados = _parsear_fila_excel(rows[0], strings, ns)
+        filas = []
+
+        for row in rows[1:]:
+            valores = _parsear_fila_excel(row, strings, ns)
+            if not any(str(v).strip() for v in valores):
+                continue
+
+            registro = {}
+            for i, head in enumerate(encabezados):
+                if not head:
+                    continue
+                registro[head] = valores[i] if i < len(valores) else ''
+            filas.append(registro)
+
+        return filas
+
+
+def _parsear_fila_excel(row_node, shared_strings, ns):
+    valores = []
+
+    for c in row_node.findall('a:c', ns):
+        tipo = c.get('t')
+        valor_node = c.find('a:v', ns)
+
+        if valor_node is None:
+            valores.append('')
+            continue
+
+        valor = valor_node.text or ''
+        if tipo == 's':
+            idx = int(valor)
+            valor = shared_strings[idx] if idx < len(shared_strings) else ''
+
+        valores.append(valor)
+
+    return valores
 
 # --- FUNCIÓN PRINCIPAL ---
 def resolver_viga_backend(longitud, soportes_input, cargas_input, perfil_usuario="WF", fs_usuario=2.0):
