@@ -583,33 +583,7 @@ btnAgregarCarga.addEventListener('click', () => {
 });
 
 
-
-function resolveApiBaseUrl() {
-    const configuredUrl = window.CALCULADORA_API_BASE_URL || '';
-    const trimmed = String(configuredUrl).trim();
-    if (!trimmed) {
-        return '';
-    }
-
-    const lowerUrl = trimmed.toLowerCase();
-    const pareceDeployHook = lowerUrl.includes('/deploy') || lowerUrl.includes('/trigger');
-
-    if (pareceDeployHook) {
-        console.warn(
-            '[Calculadora de Vigas] CALCULADORA_API_BASE_URL parece apuntar a un deploy hook y no al API.',
-            trimmed
-        );
-        alert(
-            'La configuración del frontend usa una URL de deploy y no la del API. ' +
-            'Configura CALCULADORA_API_BASE_URL con la URL pública del backend (ejemplo: https://tu-api.onrender.com).'
-        );
-        return '';
-    }
-
-    return trimmed.endsWith('/') ? trimmed.slice(0, -1) : trimmed;
-}
-
-const API_BASE_URL = resolveApiBaseUrl();
+const API_BASE_URL = 'https://calculadora-de-vigas-back.onrender.com';
 
 btnResolver.addEventListener('click', async () => {
     
