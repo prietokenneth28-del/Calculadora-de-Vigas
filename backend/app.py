@@ -1,7 +1,7 @@
 from flask import Flask
 from flask_cors import CORS
 
-from backend.api.routes import beam_api
+from api.routes import beam_api
 
 
 def create_app() -> Flask:

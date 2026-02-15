@@ -1,6 +1,6 @@
 from flask import Blueprint, jsonify, request
 
-from backend.services.beam_analysis_service import RequestValidationError, analyze_beam
+from services.beam_analysis_service import RequestValidationError, analyze_beam
 
 
 beam_api = Blueprint("beam_api", __name__)

@@ -1,7 +1,7 @@
 from typing import Any
 
-from backend.domain.models import BeamRequest
-from backend.logica_singularidad import resolver_viga_backend
+from domain.models import BeamRequest
+from logica_singularidad import resolver_viga_backend
 
 
 class RequestValidationError(ValueError):
