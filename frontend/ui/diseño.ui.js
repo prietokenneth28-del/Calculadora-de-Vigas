@@ -617,9 +617,22 @@ btnResolver.addEventListener('click', async () => {
             // 1. Renderizar Reacciones (Igual que antes)
             tablaReaccionesBody.innerHTML = '';
             data.reacciones.forEach(res => {
-                 // ... (Tu código existente de reacciones) ...
                  const fila = document.createElement('tr');
-                 fila.innerHTML = `<td>${res.tipo}</td><td>${res.posicion} m</td><td>${res.magnitud} kN</td><td>-</td><td>-</td>`;
+                 
+                 const textoMomento = (res.momento && Math.abs(res.momento) > 0.001) 
+                                      ? `<strong>${res.momento}</strong> kN.m` 
+                                      : '-';
+
+                 // Asumimos Rx como 0 por ahora (vigas simples)
+                 const textoRx = '0 kN'; 
+
+                 fila.innerHTML = `
+                    <td>${res.tipo}</td>
+                    <td>${res.posicion} m</td>
+                    <td>${res.magnitud} kN</td>
+                    <td>${textoRx}</td>
+                    <td>${textoMomento}</td>
+                 `;
                  tablaReaccionesBody.appendChild(fila);
             });
 
@@ -642,7 +655,7 @@ btnResolver.addEventListener('click', async () => {
         console.error(error);
         alert("Error de conexión");
     } finally {
-        btnResolver.innerHTML = 'RESOLVER VIGA';
+        btnResolver.innerHTML = '<i class="bi bi-calculator me-2"></i> RESOLVER VIGA';
         btnResolver.disabled = false;
     }
 });

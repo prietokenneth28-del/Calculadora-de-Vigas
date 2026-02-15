@@ -321,17 +321,38 @@ def resolver_viga_backend(longitud, soportes_input, cargas_input, perfil_usuario
 
     resultados_reacciones = []
     for i, s in enumerate(soportes_input):
+        resultados_reacciones.append({
+            'id': i, 
+            'posicion': s['posicion'], 
+            'tipo': s['tipo'],
+            'magnitud': 0.0, # Ry (Vertical)
+            'momento': 0.0   # M (Momento)
+        })
+
+    # 2. Asignar Reacciones Verticales (Ry)
+    for i, s in enumerate(soportes_input):
         if R_sym[i] in solucion:
             r_val = float(solucion[R_sym[i]])
+            
+            # Actualizar datos para la tabla
+            resultados_reacciones[i]['magnitud'] = round(r_val, 2)
+            
+            # Actualizar diagramas (Lógica existente)
             v_num += singularidad_num(x_vec, float(s['posicion']), 0, r_val)
             M_num += singularidad_num(x_vec, float(s['posicion']), 1, r_val)
-            resultados_reacciones.append({'id': i, 'posicion': s['posicion'], 'magnitud': round(r_val, 2), 'tipo': s['tipo']})
 
+    # 3. Asignar Momentos de Empotramiento (M)
     for i, s_idx in enumerate(empotrados_idx):
         if M_emp_sym[i] in solucion:
             m_val = float(solucion[M_emp_sym[i]])
+            
+            # Actualizar datos para la tabla: Usamos s_idx para ubicar el soporte correcto
+            resultados_reacciones[s_idx]['momento'] = round(m_val, 2)
+            
+            # Actualizar diagramas (Lógica existente)
+            # NOTA: En diagramas de singularidad, el momento puntual externo resta en la ecuación de singularidad
             pos = float(soportes_input[s_idx]['posicion'])
-            M_num -= singularidad_num(x_vec, pos, 0, m_val)
+            M_num += -singularidad_num(x_vec, pos, 0, m_val)
 
     # -------------------------------------------------------------------------
     # --- NUEVA LÓGICA: ANÁLISIS DE ESFUERZO ---
