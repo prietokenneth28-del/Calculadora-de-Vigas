@@ -40,11 +40,11 @@ let condicionesIniciales = [];
 let listaCargasDatos = [];
 
 const IMAGENES_CARGAS = {
-    'Puntual': '../images/Puntual.jpg',
-    'Momento': '../images/Momento.jpg',
-    'Distribuida-Rectangular': '../images/Cuadrada.jpg',
-    'Distribuida-Triangular 1': '../images/Triangular 1.jpg',
-    'Distribuida-Triangular 2': '../images/Triangular 2.jpg'
+    'Puntual': '../static/images/Puntual.jpg',
+    'Momento': '../static/images/Momento.jpg',
+    'Distribuida-Rectangular': '../static/images/Cuadrada.jpg',
+    'Distribuida-Triangular 1': '../static/images/Triangular 1.jpg',
+    'Distribuida-Triangular 2': '../static/images/Triangular 2.jpg'
 };
 
 const btnResolver = document.getElementById("btnResolver");
