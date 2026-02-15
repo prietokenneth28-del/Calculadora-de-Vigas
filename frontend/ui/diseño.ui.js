@@ -583,6 +583,19 @@ btnAgregarCarga.addEventListener('click', () => {
 });
 
 
+
+function resolveApiBaseUrl() {
+    const configuredUrl = window.CALCULADORA_API_BASE_URL || '';
+    const trimmed = String(configuredUrl).trim();
+    if (!trimmed) {
+        return '';
+    }
+
+    return trimmed.endsWith('/') ? trimmed.slice(0, -1) : trimmed;
+}
+
+const API_BASE_URL = resolveApiBaseUrl();
+
 btnResolver.addEventListener('click', async () => {
     
     // Capturamos los valores de diseño del HTML
@@ -603,7 +616,7 @@ btnResolver.addEventListener('click', async () => {
     btnResolver.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Calculando...';
     
     try {
-        const response = await fetch('http://127.0.0.1:5000/calcular', {
+        const response = await fetch(`${API_BASE_URL}/calcular`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify(datosEnvio)
