@@ -1,6 +1,6 @@
 clc
 clear 
-syms x c1 c2
+syms x c1 c2 real
 
 %% Informacion del tipo de problema iniciales:
 tiposReacciones = ["articulada", "libre", "empotrada"; ... %Tipo de union 
@@ -15,7 +15,7 @@ tiposCarga      = ["Puntual" , ...
 
 %% Condiciones del problema
 %longitud de la viga:
-l = 1.4;
+l = 10;
 Sy = 25; %Esfuerzo de fluencia del acero estructural A-36
 FS = 2; %Factor de seguridad asumido por el diseñador.
 %Reacciones:
@@ -30,8 +30,8 @@ rb = [  5  ...                   %ubicación [m]
         tiposReacciones(1,1) ... %tipo de apoyo 
      ];
 
-rc = [  1.4  ...                   %ubicación [m]
-        tiposReacciones(1,1) ... %tipo de apoyo 
+rc = [  10  ...                   %ubicación [m]
+        tiposReacciones(1,3) ... %tipo de apoyo 
     ];
 
 
@@ -54,10 +54,10 @@ fb = [ -5 ...%Magnitud   [kN]
         0   ...%final     [m]
         tiposCarga(5)
      ];
-fc = [ -196.2/2 ... %Magnitud  [kN]
-        0.7 ... %Ubicacion [m]
-        0  ... %final     [m]
-        tiposCarga(1)
+fc = [ -80 ... %Magnitud  [kN]
+        2 ... %Ubicacion [m]
+        7  ... %final     [m]
+        tiposCarga(2)
      ];
 
 
@@ -94,6 +94,7 @@ paso = 0.01;
 y = zeros(1,size(0:paso:l,1)); %Vector de singularidad de deflexion
 M = zeros(1,size(0:paso:l,1)); %Vector de singularidad de fuerza cortante
 v = zeros(1,size(0:paso:l,1)); %Vector de singularidad de momento flector
+theta = zeros(1,size(0:paso:l,1));
 momentos = 0;                  %Variables para almacenar los momentos aplicados en la viga;
 
 fed = zeros(size(f,1),2); % Matriz para guardar la informacion f sin tener que modificarla
@@ -108,6 +109,9 @@ for i = 1:size(f,1)
          %DEFLEXION:
         sing = singularidad(posicion,3,magnitud,l);
 
+        %
+        singTheta = singularidad(posicion,2,magnitud,l);
+
         %MOMENTO FLECTOR:
         singM = singularidad(posicion,1,magnitud,l);
 
@@ -120,7 +124,8 @@ for i = 1:size(f,1)
         y = sing + y;
         M = singM + M;
         v = singV + v;
-    
+        theta = singTheta + theta;
+
     elseif f(i,4) == tiposCarga(2)  %Distribuida-Rectangular
         %Variables a utilizar:
         magnitud = double(f(i,1));   %w0
@@ -131,6 +136,9 @@ for i = 1:size(f,1)
         %Ecuacion de singularidad:
         %DEFLEXION:
         sing = singularidad(inicio,4,magnitud,l) - singularidad(final,4,magnitud,l);
+
+        %
+        singTheta = singularidad(inicio,3,magnitud,l) - singularidad(final,3,magnitud,l);
 
         %MOMENTO FLECTOR:
         singM = singularidad(inicio,2,magnitud,l) - singularidad(final,2,magnitud,l);
@@ -145,6 +153,7 @@ for i = 1:size(f,1)
         y = sing + y;
         M = singM + M;
         v = singV + v;
+        theta = singTheta + theta;
     elseif f(i,4) == tiposCarga(3)  %Distribuida-Triangular 1
         %Variables a utilizar:
         magnitud = double(f(i,1));   %w0
@@ -158,6 +167,10 @@ for i = 1:size(f,1)
         sing = singularidad(inicio,5,magnitud,l)./longitudCarga ...
               -singularidad(final, 5,magnitud,l)./longitudCarga ...
               -singularidad(final, 4,magnitud,l);
+        
+        singTheta = singularidad(inicio,4,magnitud,l)./longitudCarga ...
+                  -singularidad(final, 4,magnitud,l)./longitudCarga ...
+                  -singularidad(final, 3,magnitud,l);
 
         %MOMENTO:
         singM = singularidad(inicio,3,magnitud,l)./longitudCarga ...
@@ -176,6 +189,7 @@ for i = 1:size(f,1)
         y = sing + y;
         M = singM + M;
         v = singV + v;
+        theta = singTheta + theta;
 
     elseif f(i,4) == tiposCarga(4)  %Distribuida-Triangular 2
         %Variables a utilizar:
@@ -188,7 +202,11 @@ for i = 1:size(f,1)
         sing = singularidad(inicio,4,magnitud,l) ...
               -singularidad(inicio,5,magnitud,l)./longitudCarga ...
               +singularidad(final, 5,magnitud,l)./longitudCarga;
-              
+        
+        %
+        singTheta = singularidad(inicio,3,magnitud,l) ...
+                  -singularidad(inicio,4,magnitud,l)./longitudCarga ...
+                  +singularidad(final, 4,magnitud,l)./longitudCarga;
         %MOMENTO:
         singM =  singularidad(inicio,2,magnitud,l) ...
                 -singularidad(inicio,3,magnitud,l)./longitudCarga ...
@@ -207,7 +225,7 @@ for i = 1:size(f,1)
         y = sing + y;
         M = singM + M;
         v = singV + v;
-
+        theta = singTheta + theta;
     elseif f(i,4) == tiposCarga(5)  %Momento
 
         magnitud =  double(f(i,1));   %M0
@@ -216,6 +234,8 @@ for i = 1:size(f,1)
         %Ecuacion de singularidad:
         sing = singularidad(posicion,2,magnitud,l);
 
+        singTheta = singularidad(posicion,1,magnitud,l);
+
         %MOMENTO:
         singM =  singularidad(posicion,0,magnitud,l);
 
@@ -223,7 +243,7 @@ for i = 1:size(f,1)
         momentos = momentos + magnitud;
         y = sing + y;
         M = singM + M;
-              
+        theta = singTheta + theta;      
     end
 end
 
@@ -232,11 +252,12 @@ end
 
 
 msim = c1 * x + c2; % Para almacenar la ecuacion:
-MSIM = 0;
+MSIM = c1;
 %Validacion del tipo de apoyo para calcular el momento:
 
-var  = sym('R', [1 length(r)]); %Reacciones a calcular:
-varM = sym('M', [1 length(r)]); %Momento a calcular
+
+var  = sym('R', [1 length(r)], 'real'); 
+varM = sym('M', [1 length(r)], 'real');
 
 varM1 = 0;
 %Se haya la ecuacion general de singularidad simbolica para las reacciones:
@@ -252,10 +273,9 @@ for j = 1:length(r)
         
         %------------------------------MOMENTO-----------------------------------
         %Momento:
-        MSIM = varM(j) * (x - posicion)^0 * heaviside(x - posicion) + MSIM;
+        MSIM = (varM(j)/6) * (x - posicion)^3 * heaviside(x - posicion) + MSIM;
         %Fuerza:
-        MSIM = var(j)  * (x - posicion)^1 * heaviside(x - posicion) + MSIM;
-
+        MSIM = (var(j)/2)  * (x - posicion)^2 * heaviside(x - posicion) + MSIM;
 
         varM1 = [varM1 varM(j)]; %Vector para almacenar las incognitas de Momento en empotramiento
     else
@@ -265,53 +285,87 @@ for j = 1:length(r)
         msim = (var(j) / 6) * (x - posicion)^3 * heaviside(x - posicion) + msim; 
 
         %------------------------------MOMENTO-----------------------------------
-        MSIM = var(j)  * (x - posicion)^1 * heaviside(x - posicion) + MSIM;
+        MSIM = (var(j)/2)  * (x - posicion)^2 * heaviside(x - posicion) + MSIM;
     end
 
 end
 varM1 = varM1(2:end);
 
 %Determinacion del sistema de ecuaciones:
-ec = sym(zeros(length(r),1)); %Cantidad de ecuaciones 
-ecM = sym(zeros(2,1));   %Condiciones de Frontera para momento
+ec  = sym(zeros(length(r),1)); %Cantidad de ecuaciones 
+ecM = 0;   %Condiciones de Frontera para momento
 
 for i = 1:length(r)
+    %Ecuaciones de deflexion en las condiciones de frontera:
     posicion = double(r(i,1));
     indice_vector = round(posicion/paso) + 1; 
     if indice_vector > length(y); indice_vector = length(y); end 
     ec(i,1)  = subs(msim,x,posicion) + y(indice_vector);
+    
+    %Ecuaciones del angulo de deflexion si existe empotramiento:
+    if r(i,2) == tiposReacciones(1,3)
+        ecM1 = subs(MSIM,x,posicion) + theta(indice_vector);
+        ecM = [ecM ecM1];
+    end 
 end
 
-%Ecuaciones de condiciones de frontera para el momento:
-ecM(1,1) = subs(MSIM,x,0) + M(1);
-ecM(2,1) = subs(MSIM,x,l) + M(end);
+ecM = ecM(2:end);
+
+%Si es una condicion de doble empotramiento utiliza solo la segunda ecuacion para calcular la deformacion
 
 
-% Para despejar el numero de ecuaciones necesarias para resolver la indeterminación
-if isempty(varM1) %Por si no existe un caso de empotramiento
-    varM1 = 0;
-    unk = [c1 c2 var(1 : n - 2)];
-    sol = solve(ec, unk, 'ReturnConditions', false);
-else %Para detectar caso de empotramiento
-    unk = [c1 c2 var(1 : 2) varM1];
-    sol = solve([ec(1:2) ecM], unk, 'ReturnConditions', false);
+% Construcción de la lista de incógnitas y del sistema a resolver
+
+% var  -> vector de reacciones simbólicas (1 x number_of_reactions)
+% varM1 -> vector con momentos de empotramiento (1 x number_of_empotrados), o [] si no hay
+
+%Vacio si no existe empotramiento
+if isequal(varM1, 0)
+    varM1 = sym([]);
+end
+
+% Lista completa de incógnitas <<<<<<<<<<<<<<------------------------------------------
+if length(ecM) == 2
+    ecM = ecM(2);
+    unk = [c1, c2, var(1)];
+    numAdd = n - 3;
+else
+    unk = [c1, c2, var, varM];
+    numAdd = n - 2;
 end
 
 
-ecucionesAdicionales = sym('eq', [1 n - 2]);
-j = 1;
-
-%Para ordenar el numero de ecuaciones necesarias para resolver el sistema:
-for i = 1 : n - 2
-    ecucionesAdicionales(i) = sol.(char(var(j))) - var(j);
-    j = j + 1; 
+% Sistema de ecuaciones: ec (condiciones de deflexion) y ecM (condiciones de momento si existen)
+if isempty(varM1)
+    ecuaciones = ec;             % solo condiciones de deflexion
+else
+    ecuaciones = [ec', ecM];    % concatena condiciones de deflexion y condiciones de momento
 end
 
+% Resolver todo junto (evita problemas de campos faltantes en sol)
+sol = solve(ecuaciones==0, unk, 'ReturnConditions', false);
+
+% Ahora construimos las ecuaciones adicionales (solo si se necesitan)
+
+if numAdd > 0
+    ecucionesAdicionales = sym(zeros(1, numAdd));
+    for k = 1:numAdd
+        nameVar = char(var(k));
+        if isfield(sol, nameVar)
+            ecucionesAdicionales(k) = sol.(nameVar) - var(k);
+        else
+            % Si por alguna razón no está resuelto, devolvemos la expresión simbólica
+            ecucionesAdicionales(k) = sym([]); % o podrías poner: var(k) - var(k) para 0
+        end
+    end
+else
+    ecucionesAdicionales = sym([]);
+end
 
 %% Armado de ecuaciones:
 
 fr =  sum(fed(:,1));                                %Termino independiente de la fuerza 
-mr =  sum((fed(:,2)) .* fed(:,1)) -  momentos;   %Termino independiente del momento                  
+mr =  sum((fed(:,2)) .* fed(:,1)) +  momentos;   %Termino independiente del momento                  
 
 %Sistema de ecuaciones provenientes de las condiciones de equilibrio
 ec1 = sum(var) == -fr;
@@ -335,46 +389,58 @@ for i = 1 : length(var)
     M = M + singularidad(posicion, 1, magnitud, l);
 end 
 
-%Calculo de singularidad para los momentos ya calculado si existe algun empotramiento:
-if varM1 ~= 0 
-    for i = 1 : length(varM1)
-        magnitud = double(sol.(char(varM1(i))));
-        posicion = double(r(i,1));
 
+%Calculo de singularidad para los momentos ya calculado si existe algun empotramiento:
+j = 1;
+for i = 1:length(r)
+    if r(i,2) == tiposReacciones(1,3)
+        magnitud = double(sol.(char(varM1(j))));
+        posicion = double(r(i,1));
         disp("M" + num2str(i) + " = " + num2str(magnitud,'%.2f'))
-        M = M + singularidad(posicion, 0, magnitud, l);
-    end 
+        M = M - singularidad(posicion, 0, magnitud, l);
+        j = j + 1;
+    end
 end
 
-% tiledlayout(2,1)
+%% Puntos claves de los diagramas:
+L    = 0:paso:l;
 
-% L = 0:paso:l;
-% %Diagrama de fuerza cortante:
-% nexttile
-%     plot(L,v,'black','LineWidth',3)
-%     hold on
-%     title('Diagrama de Fuerza cortante')
-%     xline(0,LineWidth=2)
-%     yline(0,LineWidth=2)
-%     xlim([-0.5 l+1])
-%     xlabel('x[m]')
-%     ylabel('V[kN]')
-%     area(L,v,'FaceColor', "#0072BD", 'LineWidth', 2)
-%     grid on
-%     hold off
+%Maximos y minimos 
+Mmax   = max([max(M), min(M)]);
+xMax   = L(find(M == Mmax));
 
-% %Diagrama de momento flector
-% nexttile
-%     plot(L,M,'Color','black','LineWidth',4)
-%     hold on
-%     title('Diagrama de Momento flector')
-%     xline(0,LineWidth=2)
-%     yline(0,LineWidth=2)
-%     xlim([-0.5 l+1])
-%     xlabel('x[m]')
-%     ylabel('M[kN.m]')
-%     area(L,M,'FaceColor',"#D95319")
-%     grid on
+%% Graficación:
+tiledlayout(2,1)
+
+
+%Diagrama de fuerza cortante:
+nexttile
+    plot(L,v,'black','LineWidth',3)
+    hold on
+    xline(xMax,"r--",LineWidth=2)
+    title('Diagrama de Fuerza cortante')
+    xline(0,LineWidth=2)
+    yline(0,LineWidth=2)
+    xlim([-0.5 l+1])
+    xlabel('x[m]')
+    ylabel('V[kN]')
+    area(L,v,'FaceColor', "#0072BD", 'LineWidth', 2)
+    grid on
+    hold off
+
+%Diagrama de momento flector
+nexttile
+    plot(L,M,'Color','black','LineWidth',4)
+    hold on
+    xline(xMax,"r--",LineWidth=2)
+    title('Diagrama de Momento flector')
+    xline(0,LineWidth=2)
+    yline(0,LineWidth=2)
+    xlim([-0.5 l+1])
+    xlabel('x[m]')
+    ylabel('M[kN.m]')
+    area(L,M,'FaceColor',"#D95319")
+    grid on
 
 %% Analisis de esfuerzo de la viga:
 
@@ -424,7 +490,7 @@ Peso_tabla = num2cell(Peso_tabla);
 Sxx = [arregloPerfiles.Sx];
 posicion = find(Sxx >= Sx_req, 10);
 
-tablaResultados = struct2table(arregloPerfiles(posicion))
+tablaResultados = struct2table(arregloPerfiles(posicion));
 
 
 
