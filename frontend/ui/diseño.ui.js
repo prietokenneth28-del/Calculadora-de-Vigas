@@ -591,6 +591,21 @@ function resolveApiBaseUrl() {
         return '';
     }
 
+    const lowerUrl = trimmed.toLowerCase();
+    const pareceDeployHook = lowerUrl.includes('/deploy') || lowerUrl.includes('/trigger');
+
+    if (pareceDeployHook) {
+        console.warn(
+            '[Calculadora de Vigas] CALCULADORA_API_BASE_URL parece apuntar a un deploy hook y no al API.',
+            trimmed
+        );
+        alert(
+            'La configuración del frontend usa una URL de deploy y no la del API. ' +
+            'Configura CALCULADORA_API_BASE_URL con la URL pública del backend (ejemplo: https://tu-api.onrender.com).'
+        );
+        return '';
+    }
+
     return trimmed.endsWith('/') ? trimmed.slice(0, -1) : trimmed;
 }
 
@@ -622,7 +637,20 @@ btnResolver.addEventListener('click', async () => {
             body: JSON.stringify(datosEnvio)
         });
 
-        const result = await response.json();
+        const rawBody = await response.text();
+        let result;
+
+        try {
+            result = JSON.parse(rawBody);
+        } catch {
+            if (rawBody.includes('private URL to trigger a deploy')) {
+                throw new Error(
+                    'El frontend está consultando una URL de deploy hook. Debes usar la URL pública del API en CALCULADORA_API_BASE_URL.'
+                );
+            }
+
+            throw new Error(`Respuesta inválida del servidor: ${rawBody.slice(0, 120)}`);
+        }
 
         if (result.status === 'success') {
             const data = result.data;
@@ -666,7 +694,7 @@ btnResolver.addEventListener('click', async () => {
         }
     } catch (error) {
         console.error(error);
-        alert("Error de conexión");
+        alert(error.message || "Error de conexión");
     } finally {
         btnResolver.innerHTML = '<i class="bi bi-calculator me-2"></i> RESOLVER VIGA';
         btnResolver.disabled = false;
