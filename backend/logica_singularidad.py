@@ -11,6 +11,34 @@ import xml.etree.ElementTree as ET
 import matplotlib
 matplotlib.use('Agg')
 
+TIPOS_SOPORTE = {
+    'fijo': 1,
+    'móvil': 1,
+    'movil': 1,
+    'articulada': 1,
+    'empotrado': 2,
+    'libre': 0
+}
+
+
+def _normalizar_tipo(texto):
+    return str(texto or '').strip().lower()
+
+
+def _es_distribuida_rectangular(tipo):
+    t = _normalizar_tipo(tipo)
+    return 'distribuida' in t and 'rectangular' in t
+
+
+def _es_distribuida_triangular_1(tipo):
+    t = _normalizar_tipo(tipo)
+    return 'distribuida' in t and 'triangular 1' in t
+
+
+def _es_distribuida_triangular_2(tipo):
+    t = _normalizar_tipo(tipo)
+    return 'distribuida' in t and 'triangular 2' in t
+
 # --- FUNCIONES MATEMÁTICAS ---
 def singularidad_num(x_vals, a, n, A):
     heaviside = np.where(x_vals >= a, 1.0, 0.0)
@@ -154,51 +182,121 @@ def resolver_viga_backend(longitud, soportes_input, cargas_input, perfil_usuario
     y_num = np.zeros_like(x_vec)
     M_num = np.zeros_like(x_vec)
     v_num = np.zeros_like(x_vec)
+    theta_num = np.zeros_like(x_vec)
     fed_list = []
     momentos_aplicados = 0
+    a_ref = min(float(s['posicion']) for s in soportes_input) if soportes_input else 0.0
     
     # 1. Procesar Cargas (Igual que antes)
     for c in cargas_input:
-        tipo = c.get('tipo')
+        tipo = c.get('tipo', '')
         mag = float(c.get('magnitud'))
         
         if tipo == 'Puntual':
             pos = float(c.get('posicion'))
             y_num += singularidad_num(x_vec, pos, 3, mag)
+            theta_num += singularidad_num(x_vec, pos, 2, mag)
             M_num += singularidad_num(x_vec, pos, 1, mag)
             v_num += singularidad_num(x_vec, pos, 0, mag)
-            fed_list.append([mag, pos])
-        elif 'Distribuida' in tipo:
+            fed_list.append([mag, pos - a_ref])
+        elif _es_distribuida_rectangular(tipo):
             inicio = float(c.get('inicio'))
             fin = float(c.get('fin'))
             longitud_c = fin - inicio
-            if 'Rectangular' in tipo:
-                y_num += (singularidad_num(x_vec, inicio, 4, mag) - singularidad_num(x_vec, fin, 4, mag))
-                M_num += (singularidad_num(x_vec, inicio, 2, mag) - singularidad_num(x_vec, fin, 2, mag))
-                v_num += (singularidad_num(x_vec, inicio, 1, mag) - singularidad_num(x_vec, fin, 1, mag))
-                fed_list.append([mag * longitud_c, inicio + longitud_c/2])
-            elif 'Triangular' in tipo: # Agregado soporte básico triangular si lo tenías
-                 pass # (Mantén tu lógica triangular aquí si la usas)
+            y_num += (singularidad_num(x_vec, inicio, 4, mag) - singularidad_num(x_vec, fin, 4, mag))
+            theta_num += (singularidad_num(x_vec, inicio, 3, mag) - singularidad_num(x_vec, fin, 3, mag))
+            M_num += (singularidad_num(x_vec, inicio, 2, mag) - singularidad_num(x_vec, fin, 2, mag))
+            v_num += (singularidad_num(x_vec, inicio, 1, mag) - singularidad_num(x_vec, fin, 1, mag))
+            fed_list.append([mag * longitud_c, (inicio + longitud_c/2) - a_ref])
+        elif _es_distribuida_triangular_1(tipo):
+            inicio = float(c.get('inicio'))
+            fin = float(c.get('fin'))
+            longitud_c = inicio - fin
+            if longitud_c == 0:
+                continue
+
+            y_num += (
+                singularidad_num(x_vec, inicio, 5, mag)/longitud_c
+                - singularidad_num(x_vec, fin, 5, mag)/longitud_c
+                - singularidad_num(x_vec, fin, 4, mag)
+            )
+            theta_num += (
+                singularidad_num(x_vec, inicio, 4, mag)/longitud_c
+                - singularidad_num(x_vec, fin, 4, mag)/longitud_c
+                - singularidad_num(x_vec, fin, 3, mag)
+            )
+            M_num += (
+                singularidad_num(x_vec, inicio, 3, mag)/longitud_c
+                - singularidad_num(x_vec, fin, 3, mag)/longitud_c
+                - singularidad_num(x_vec, fin, 2, mag)
+            )
+            v_num += (
+                singularidad_num(x_vec, inicio, 2, mag)/longitud_c
+                - singularidad_num(x_vec, fin, 2, mag)/longitud_c
+                - singularidad_num(x_vec, fin, 1, mag)
+            )
+            fed_list.append([mag * longitud_c / 2, (inicio + (longitud_c * (2/3))) - a_ref])
+        elif _es_distribuida_triangular_2(tipo):
+            inicio = float(c.get('inicio'))
+            fin = float(c.get('fin'))
+            longitud_c = inicio - fin
+            if longitud_c == 0:
+                continue
+
+            y_num += (
+                singularidad_num(x_vec, inicio, 4, mag)
+                - singularidad_num(x_vec, inicio, 5, mag)/longitud_c
+                + singularidad_num(x_vec, fin, 5, mag)/longitud_c
+            )
+            theta_num += (
+                singularidad_num(x_vec, inicio, 3, mag)
+                - singularidad_num(x_vec, inicio, 4, mag)/longitud_c
+                + singularidad_num(x_vec, fin, 4, mag)/longitud_c
+            )
+            M_num += (
+                singularidad_num(x_vec, inicio, 2, mag)
+                - singularidad_num(x_vec, inicio, 3, mag)/longitud_c
+                + singularidad_num(x_vec, fin, 3, mag)/longitud_c
+            )
+            v_num += (
+                singularidad_num(x_vec, inicio, 1, mag)
+                - singularidad_num(x_vec, inicio, 2, mag)/longitud_c
+                + singularidad_num(x_vec, fin, 2, mag)/longitud_c
+            )
+            fed_list.append([mag * longitud_c / 2, (inicio + (longitud_c * (1/3))) - a_ref])
         elif tipo == 'Momento':
             pos = float(c.get('posicion'))
             y_num += singularidad_num(x_vec, pos, 2, mag)
+            theta_num += singularidad_num(x_vec, pos, 1, mag)
             M_num += singularidad_num(x_vec, pos, 0, mag)
             momentos_aplicados += mag
 
     # 2. Resolución Simbólica (Igual que antes)
     x_sym, c1, c2 = sp.symbols('x c1 c2')
     R_sym = sp.symbols(f'R0:{len(soportes_input)}')
+    empotrados_idx = [i for i, s in enumerate(soportes_input) if _normalizar_tipo(s.get('tipo')) == 'empotrado']
+    M_emp_sym = sp.symbols(f'M0:{len(empotrados_idx)}')
     deflexion_reacc_sym = 0
-    momentos_reacc_eq_sym = 0
+    rotacion_reacc_sym = 0
     fuerzas_reacc_eq_sym = 0
+    momento_eq_sym = 0
     
     for i, s in enumerate(soportes_input):
         r_pos = float(s['posicion'])
         deflexion_reacc_sym += (R_sym[i] / 6) * (x_sym - r_pos)**3 * sp.Heaviside(x_sym - r_pos)
+        rotacion_reacc_sym += (R_sym[i] / 2) * (x_sym - r_pos)**2 * sp.Heaviside(x_sym - r_pos)
         fuerzas_reacc_eq_sym += R_sym[i]
-        momentos_reacc_eq_sym += R_sym[i] * r_pos
+
+        if _normalizar_tipo(s.get('tipo')) == 'empotrado':
+            m_idx = empotrados_idx.index(i)
+            deflexion_reacc_sym += (M_emp_sym[m_idx] / 2) * (x_sym - r_pos)**2 * sp.Heaviside(x_sym - r_pos)
+            rotacion_reacc_sym += M_emp_sym[m_idx] * (x_sym - r_pos) * sp.Heaviside(x_sym - r_pos)
+
+    for i, _ in enumerate(empotrados_idx):
+        momento_eq_sym += M_emp_sym[i]
 
     deflexion_total_sym = deflexion_reacc_sym + c1*x_sym + c2
+    rotacion_total_sym = rotacion_reacc_sym + c1
     ecuaciones = []
 
     for s in soportes_input:
@@ -206,17 +304,15 @@ def resolver_viga_backend(longitud, soportes_input, cargas_input, perfil_usuario
         idx = int(round(r_pos / paso))
         if idx >= len(y_num): idx = len(y_num) - 1
         ecuaciones.append(deflexion_total_sym.subs(x_sym, r_pos) + y_num[idx])
-        
-        # Soporte empotrado (Momento = 0 en giro) - Lógica simplificada
-        if s['tipo'] == 'Empotrado':
-            pass # (Aquí iría la lógica extra de empotramiento si la tienes implementada)
+        if _normalizar_tipo(s.get('tipo')) == 'empotrado':
+            ecuaciones.append(rotacion_total_sym.subs(x_sym, r_pos) + theta_num[idx])
 
     sum_f = sum([f[0] for f in fed_list])
     sum_m = sum([f[0] * f[1] for f in fed_list]) + momentos_aplicados
     ecuaciones.append(fuerzas_reacc_eq_sym + sum_f)
-    ecuaciones.append(momentos_reacc_eq_sym + sum_m)
+    ecuaciones.append(sum((R_sym[i] * (float(s['posicion']) - a_ref)) for i, s in enumerate(soportes_input)) + momento_eq_sym + sum_m)
     
-    incognitas = list(R_sym) + [c1, c2]
+    incognitas = list(R_sym) + list(M_emp_sym) + [c1, c2]
     # Nota: solve puede ser lento, asegúrate de manejar excepciones
     try:
         solucion = sp.solve(ecuaciones, incognitas)
@@ -230,6 +326,12 @@ def resolver_viga_backend(longitud, soportes_input, cargas_input, perfil_usuario
             v_num += singularidad_num(x_vec, float(s['posicion']), 0, r_val)
             M_num += singularidad_num(x_vec, float(s['posicion']), 1, r_val)
             resultados_reacciones.append({'id': i, 'posicion': s['posicion'], 'magnitud': round(r_val, 2), 'tipo': s['tipo']})
+
+    for i, s_idx in enumerate(empotrados_idx):
+        if M_emp_sym[i] in solucion:
+            m_val = float(solucion[M_emp_sym[i]])
+            pos = float(soportes_input[s_idx]['posicion'])
+            M_num -= singularidad_num(x_vec, pos, 0, m_val)
 
     # -------------------------------------------------------------------------
     # --- NUEVA LÓGICA: ANÁLISIS DE ESFUERZO ---
