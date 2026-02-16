@@ -412,7 +412,55 @@ function dibujarFlecha(ctx, fromX, fromY, toX, toY) {
     ctx.fill();
 }
 
+// =================== LÓGICA DE CONFIGURACIÓN ===================
+// Estado global por defecto
+let configGlobal = {
+    unidades: 'SI',
+    moduloElasticidad: 200 // Por defecto 200 GPa
+};
 
+// Elementos del Modal
+const btnConfig = document.getElementById('BtnConfig');
+const btnGuardarConfig = document.getElementById('btnGuardarConfig');
+const selectUnidades = document.getElementById('selectUnidades');
+const inputModuloElasticidad = document.getElementById('inputModuloElasticidad');
+const labelUnidadE = document.getElementById('labelUnidadE');
+
+// Inicializar el Modal de Bootstrap
+let configModalInstance;
+document.addEventListener('DOMContentLoaded', () => {
+    configModalInstance = new bootstrap.Modal(document.getElementById('configModal'));
+});
+
+// Evento: Abrir Modal
+btnConfig.addEventListener('click', () => {
+    selectUnidades.value = configGlobal.unidades;
+    inputModuloElasticidad.value = configGlobal.moduloElasticidad;
+    configModalInstance.show();
+});
+
+// Evento: Cambio dinámico de etiqueta de Modulo de Elasticidad
+selectUnidades.addEventListener('change', (e) => {
+    labelUnidadE.textContent = e.target.value === 'SI' ? 'GPa' : 'ksi';
+});
+
+// Evento: Guardar Configuración
+btnGuardarConfig.addEventListener('click', () => {
+    configGlobal.unidades = selectUnidades.value;
+    configGlobal.moduloElasticidad = parseFloat(inputModuloElasticidad.value);
+    
+    // Cambiar dinámicamente placeholders de la UI principal según la unidad
+    const textoLong = configGlobal.unidades === 'SI' ? 'm' : 'ft';
+    const textoFuerza = configGlobal.unidades === 'SI' ? 'kN' : 'kips';
+    
+    document.querySelector('.input-group-text-dark').textContent = textoLong;
+    document.getElementById('inputMagnitudCarga').placeholder = `P0 (${textoFuerza})`;
+    
+    configModalInstance.hide();
+    
+    // Opcional: redibujar diagrama si ya hay datos, para actualizar labels
+    dibujarDiagrama(); 
+});
 
 
 
@@ -583,7 +631,8 @@ btnAgregarCarga.addEventListener('click', () => {
 });
 
 
-const API_BASE_URL = 'https://calculadora-de-vigas-back.onrender.com';
+
+const API_BASE_URL = 'http://localhost:5000';
 
 btnResolver.addEventListener('click', async () => {
     
@@ -595,9 +644,10 @@ btnResolver.addEventListener('click', async () => {
         longitud: parseFloat(inputLongitudViga.value),
         soportes: listaSoportesDatos,
         cargas: listaCargasDatos,
-        // Nuevos datos
         perfil: tipoPerfilSelect ? tipoPerfilSelect.value : 'WF',
-        fs: inputFS ? parseFloat(inputFS.value) : 2.0
+        fs: inputFS ? parseFloat(inputFS.value) : 2.0,
+        // NUEVO: Enviamos las unidades y el Módulo de Elasticidad al Python
+        configuracion: configGlobal 
     };
 
     // ... (Validaciones anteriores) ...
